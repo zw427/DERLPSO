@@ -1,0 +1,77 @@
+device: cuda:3
+
+## 参数估计模型的参数配置
+Param:
+  Net:
+      normal: False
+      max_epochs: 10000
+      load: false
+      learning_rate: 1e-4
+      train_ite: 20
+      save_epoch:       3
+      eval_epoch: 5
+      train_batch_size: 1024
+      eval_batch_size: 1024
+      VAE_Net:
+        ##encoder only rnn or ode_rnn
+        encoder:
+            type: ODE
+            ode_layers: 5 #Number of layers in ODE func in generative ODE
+            ode_unit: 8 #Number of units per layer in ODE func
+            rnn_cell: 'gru'
+            gru_unit: 8  #Number of units per layer in each of GRU update networks
+        #decoder :rnn ode_rnn,mlp
+        decoder:
+            type: ODE
+            ode_layers: 5 #Number of layers in ODE func in generative ODE
+            ode_unit: 8 #Number of units per layer in ODE func
+            rnn_cell: 'gru'
+            gru_unit: 8  #Number of units per layer in each of GRU update networks
+            ##for mlp
+            model_hidden_size:
+            - 32
+            - 16
+            - 8
+            model_nonlinearity: elu
+
+        latent_dim: 10
+
+
+      RNN_Net:
+          rnn_cell: 'gru'
+          gru_unit: 5  #Number of units per layer in each of GRU update networks
+          latent_dim: 10
+
+      ODE_RNN_Net:
+
+          ode_layers: 5 #Number of layers in ODE func in generative ODE
+          ode_unit: 5 #Number of units per layer in ODE func
+          rnn_cell: 'gru'
+          gru_unit: 5  #Number of units per layer in each of GRU update networks
+          latent_dim: 10
+
+      MLP_Net:
+
+          model_dropout_pct: 0.6
+          model_hidden_size:
+           - 32
+           - 16
+           - 8
+          model_nonlinearity: relu
+
+          latent_dim: 10
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
