@@ -64,14 +64,14 @@ class PSO():
         dydt = δ * l * v - γ * v
         return [dxdt, dydt]
 
-	 def lorenz(slef, state, t, σ, β, ρ):
+    def lorenz(self, state, t, σ, β, ρ):
         x, y, z = state
         dxdt = σ * (y - x)
         dydt = x * (ρ - z) - y
         dzdt = x * y - β * z
         return [dxdt, dydt, dzdt]
 
-	 def fitzhugh_nagumo(self, state, t, a, b):
+    def fitzhugh_nagumo(self, state, t, a, b):
         v, w = state
         dvdt = 3.0 * (v - v ** 3 / 3 + w - 0.4)
         dwdt = (-1 / 3.0) * (v - a + b * w)

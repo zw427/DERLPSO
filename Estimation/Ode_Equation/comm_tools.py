@@ -118,7 +118,7 @@ def getCovarianceMatrix(rho,num):
     matrix=np.zeros((num,num))
     for i in range(num):
         tmp=np.logspace(start=0,stop=num-i,num=num-i,base=rho,endpoint=False)
-        matrix[i,i:num]=tmp
+        matrix[i,i:num]=np.squeeze(tmp)
 
     bottom=matrix.transpose(1,0)
 
