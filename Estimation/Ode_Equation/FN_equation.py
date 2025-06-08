@@ -14,9 +14,20 @@ def f(t,y,paras):
             a = paras['a'].value
             b = paras['b'].value
 
-
         except Exception:
             a,b= paras[0],paras[1]
+
+        # # the model equations
+        df_x0 = 3.0 * (x0 - (x0 ** 3) / 3 + x1 - 0.4)
+        df_x1 = (-1 / 3.0) * (x0 - a + b * x1)
+
+        return np.array([df_x0, df_x1])
+
+
+def f_alt(y, t, a, b):
+
+        x0 = y[0]
+        x1 = y[1]
 
         # # the model equations
         df_x0 = 3.0 * (x0 - (x0 ** 3) / 3 + x1 - 0.4)

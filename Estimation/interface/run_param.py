@@ -608,7 +608,7 @@ def infer_batches(model_paths,data_filename,time_filename,param_filename,ode_fun
     df = pd.DataFrame(whole_data,index=index)
     write = pd.ExcelWriter(data_dir)
     df.to_excel(write, 'sheet_1', float_format='%.3f')
-    write.save()
+    write.close()
 
 
 
