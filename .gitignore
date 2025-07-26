@@ -1,8 +1,11 @@
-models/
+# ignore generated outputs
+saved_models/
 data/
-results/
-.idea/
+predictions/
+summary/
 .DS_Store
+.vscode
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
