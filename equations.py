@@ -21,8 +21,9 @@ class PDE_Equation(Equation):
         super().__init__(name, 'PDE', func)
 
 
-def FitzHugh_Nagumo_func(t, state, a, b, RI=0.4, tau=3.0):
-    v, w = state
+def FitzHugh_Nagumo_func(t, y, param, RI=0.4, tau=3.0):
+    v, w = y
+    a, b = param
     dvdt = v - v ** 3 / 3 - w + RI
     dwdt = (1 / tau) * (v + a - b * w)
     return [dvdt, dwdt]
@@ -30,8 +31,9 @@ def FitzHugh_Nagumo_func(t, state, a, b, RI=0.4, tau=3.0):
 FitzHugh_Nagumo = ODE_Equation("FitzHugh-Nagumo", FitzHugh_Nagumo_func)
 
 
-def Lotka_Volterra_func(t, state, a, b, y, d):
-    l, v = state
+def Lotka_Volterra_func(t, y, param):
+    l, v = y
+    a, b, y, d = param
     dldt = a * l - b * l * v
     dvdt = d * l * v - y * v
     return [dldt, dvdt]
@@ -39,8 +41,9 @@ def Lotka_Volterra_func(t, state, a, b, y, d):
 Lotka_Volterra = ODE_Equation("Lotka-Volterra", Lotka_Volterra_func)
 
 
-def Lorenz_func(t, state, a, b, p):
-        x, y, z = state
+def Lorenz_func(t, y, param):
+        x, y, z = y
+        a, b, p = param
         dxdt = a * (y - x)
         dydt = x * (p - z) - y
         dzdt = x * y - b * z

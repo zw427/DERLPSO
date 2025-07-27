@@ -3,11 +3,14 @@ from typing import List
 
 import numpy as np
 import torch
+import pandas as pd
 
 from data import generate_data, read_data
 from equations import ODE_Equation
 from models.base_model import BaseModel
 from models.ml_models import MLModel
+
+from models.DERLPSO import DERLPSO
 
 class ODE_Models:
     def __init__(self, equation: ODE_Equation, init_data: List[float], 
@@ -54,7 +57,6 @@ class ODE_Models:
                 )
 
 
-
     def evaluate(self, models: List[BaseModel], interval: List[float], points: List[int], seed: int = None) -> None:
         
         assert len(interval) == 2, "interval must have exactly two floats [start, end]"
@@ -78,3 +80,65 @@ class ODE_Models:
                 return 
 
         ### evaluate here
+        for m in models:
+            for point in points:
+
+                if isinstance(m, MLModel):
+                    pass
+
+                elif m == DERLPSO:
+                    data_file, time_file, param_file, _ = self.get_filenames(interval, point, train=False)
+                    output = read_data(data_file, time_file, param_file)
+                    data = output['data']
+                    param = output['param']
+                    time = output['time']
+
+                    
+                    results_dir = f'results/{self.equation.name}/{str(interval[0])}-{str(interval[-1])}/{point}'
+                    os.makedirs(results_dir, exist_ok=True)
+                        
+                    # Store all results
+                    results_list = []
+                    
+                    print('\n')
+                    for i in range(data.shape[0]):
+                        d = np.array(data[i])
+                        p = param[i]
+                        t = time[i]
+                        model = DERLPSO(self.equation, p, d, t)
+                        result = model.test()
+                        
+                        # Add sample index to result
+                        result['sample_id'] = i
+                        results_list.append(result)
+                        
+                        print(f"Sample {i:2d} | True: [{', '.join([f'{p:.4f}' for p in result['true_params']])}] | "
+                            f"Est: [{', '.join([f'{p:.4f}' for p in result['est_params']])}] | "
+                            f"Error: [{', '.join([f'{e:+.4f}' for e in result['err']])}] | "
+                            f"MSE: {result['mse0']:.2e}")
+                    
+                    # Convert to DataFrame
+                    df = pd.DataFrame(results_list)
+                    
+                    # Save to CSV
+                    csv_file = f'{results_dir}/DERLPSO_results.csv'
+                    df.to_csv(csv_file, index=False)
+                    
+                    # Print summary statistics (no file saving)
+                    print(f"Model: {m.__name__}")
+                    print("=" * 30)
+                    print(f"Interval: {interval}")
+                    print(f"Points: {point}")
+                    print(f"Number of samples: {len(results_list)}")
+                    print(f"Mean MSE: {df['mse0'].mean():.2e}")
+                    print(f"Std MSE: {df['mse0'].std():.2e}")
+                    print(f"Min MSE: {df['mse0'].min():.2e}")
+                    print(f"Max MSE: {df['mse0'].max():.2e}")
+                    
+                    # Parameter error statistics
+                    err_array = np.array(df['err'].tolist())
+                    print(f"Mean parameter errors: {err_array.mean(axis=0)}")
+                    print(f"Std parameter errors: {err_array.std(axis=0)}")
+                    
+                    print(f"Results saved to {csv_file}")
+          

@@ -11,8 +11,9 @@ import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 from scipy.stats import truncnorm
 
+from .base_model import BaseModel
 
-class PSO():
+class RLLPSO(BaseModel):
     def __init__(self, pN, dim, max_iter, α, β, δ, γ, numberOfLayers_list, actual_data, time, initial_conditions):
         self.r1 = 0
         self.r2 = 0
@@ -239,72 +240,72 @@ class PSO():
         return self.iteratorMse
 
 
-time = []
-current_group = []
-with open('no_noise/data1/20/time.csv', 'r') as csvfile:
-    csvreader = csv.reader(csvfile)
-    for row in csvreader:
-        row_data = [float(x) for x in row]
-        time.append(row_data)
+# time = []
+# current_group = []
+# with open('no_noise/data1/20/time.csv', 'r') as csvfile:
+#     csvreader = csv.reader(csvfile)
+#     for row in csvreader:
+#         row_data = [float(x) for x in row]
+#         time.append(row_data)
 
-param = []
-with open('no_noise/data1/20/param.csv', 'r') as csvfile:
-    csvreader = csv.reader(csvfile)
-    for row in csvreader:
-        row_data = [float(x) for x in row]
-        param.append(row_data)
+# param = []
+# with open('no_noise/data1/20/param.csv', 'r') as csvfile:
+#     csvreader = csv.reader(csvfile)
+#     for row in csvreader:
+#         row_data = [float(x) for x in row]
+#         param.append(row_data)
 
-data = []
-current_group = []
-with open('no_noise/data1/20/data.csv', 'r') as csvfile:
-    csvreader = csv.reader(csvfile)
-    for row in csvreader:
-        row_data = [float(x) for x in row]
-        # data.append(row_data)
-        data.append([row_data[i:i + 2] for i in range(0, len(row_data), 2)])
+# data = []
+# current_group = []
+# with open('no_noise/data1/20/data.csv', 'r') as csvfile:
+#     csvreader = csv.reader(csvfile)
+#     for row in csvreader:
+#         row_data = [float(x) for x in row]
+#         # data.append(row_data)
+#         data.append([row_data[i:i + 2] for i in range(0, len(row_data), 2)])
 
-numberOfLayers_list = [4, 6, 8, 10]
-max_iter = 200
-fits = []
+# numberOfLayers_list = [4, 6, 8, 10]
+# max_iter = 200
+# fits = []
 
 
-resultName = 'no_noise/data1/20/result_all_iter.csv'
-with open(resultName, 'a', newline='') as resultfile:
-    result_writer = csv.writer(resultfile)
+# resultName = 'no_noise/data1/20/result_all_iter.csv'
+# with open(resultName, 'a', newline='') as resultfile:
+#     result_writer = csv.writer(resultfile)
 
-    for i in range(100):
-        my_pso = PSO(pN=100, dim=4, max_iter=max_iter, α=param[i][0], β=param[i][1], δ=param[i][2], γ=param[i][3],
-                     numberOfLayers_list=numberOfLayers_list, actual_data=data[i], time=time[i],
-                     initial_conditions=data[i][0])
-        my_pso.init_population()
-        my_pso.iterator()
+#     for i in range(100):
+#         my_pso = PSO(pN=100, dim=4, max_iter=max_iter, α=param[i][0], β=param[i][1], δ=param[i][2], γ=param[i][3],
+#                      numberOfLayers_list=numberOfLayers_list, actual_data=data[i], time=time[i],
+#                      initial_conditions=data[i][0])
+#         my_pso.init_population()
+#         my_pso.iterator()
 
-        print(my_pso.get_iter())
-        result_writer.writerow(my_pso.get_iter())
+#         print(my_pso.get_iter())
+#         result_writer.writerow(my_pso.get_iter())
 
-        # print("param:", ["{:.16f}".format(x) for x in param[i]])
-        # print("gBest:", ["{:.16f}".format(x) for x in my_pso.get_gBest()])
-        # mse = np.mean((np.array(param[i]) - np.array(my_pso.get_gBest())) ** 2)
-        # print(mse)
+#         # print("param:", ["{:.16f}".format(x) for x in param[i]])
+#         # print("gBest:", ["{:.16f}".format(x) for x in my_pso.get_gBest()])
+#         # mse = np.mean((np.array(param[i]) - np.array(my_pso.get_gBest())) ** 2)
+#         # print(mse)
 
-        # predicted_data = odeint(my_pso.lotka_volterra, data[i][0], time[i], args=(my_pso.get_gBest()[0], my_pso.get_gBest()[1], my_pso.get_gBest()[2], my_pso.get_gBest()[3]))
-        # mse = np.mean((data[i] - predicted_data) ** 2)
-        # print("MSE:", "{:.16f}".format(my_pso.get_fit()))
-        # print("-------")
-        # fits.append(my_pso.get_fit())
+#         # predicted_data = odeint(my_pso.lotka_volterra, data[i][0], time[i], args=(my_pso.get_gBest()[0], my_pso.get_gBest()[1], my_pso.get_gBest()[2], my_pso.get_gBest()[3]))
+#         # mse = np.mean((data[i] - predicted_data) ** 2)
+#         # print("MSE:", "{:.16f}".format(my_pso.get_fit()))
+#         # print("-------")
+#         # fits.append(my_pso.get_fit())
 
-        # solution = odeint(lotka_volterra, data[i][0], time[i], args=tuple(my_pso.get_gBest()))
-        # print(solution)
-        # plt.figure(figsize=(4, 3))
-        # plt.plot(time[i], solution[:, 0])
-        # plt.plot(time[i], solution[:, 1])
-        # plt.axis('off')
-        # plt.margins(0.05, 0.05)
-        # plt.savefig('lv-10-pred.png', bbox_inches='tight', pad_inches=0)
-        # plt.show()
+#         # solution = odeint(lotka_volterra, data[i][0], time[i], args=tuple(my_pso.get_gBest()))
+#         # print(solution)
+#         # plt.figure(figsize=(4, 3))
+#         # plt.plot(time[i], solution[:, 0])
+#         # plt.plot(time[i], solution[:, 1])
+#         # plt.axis('off')
+#         # plt.margins(0.05, 0.05)
+#         # plt.savefig('lv-10-pred.png', bbox_inches='tight', pad_inches=0)
+#         # plt.show()
 
-    #     result_writer.writerow(my_pso.get_gBest())
-    #     result_writer.writerow([mse])
-    # mean_fit = np.mean(fits)
-    # print(mean_fit)
-    # result_writer.writerow([mean_fit])
+#     #     result_writer.writerow(my_pso.get_gBest())
+#     #     result_writer.writerow([mse])
+#     # mean_fit = np.mean(fits)
+#     # print(mean_fit)
+#     # result_writer.writerow([mean_fit])

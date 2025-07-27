@@ -1,21 +1,24 @@
 from scipy.integrate import odeint
 import numpy as np
 
-from base_model import BaseModel
+from .base_model import BaseModel
+from data import read_data
+from equations import Equation, ODE_Equation, PDE_Equation
+from sklearn.metrics import mean_squared_error
 
 class DERLPSO(BaseModel):
-    def __init__(self, de_type, de_func, param_num, data, times, particle_num=100,
+    def __init__(self, func:Equation, param, data, times, particle_num=100,
                  max_iter=200, layers_list=[4, 6, 8, 10], upper=10,
                  lower=1e-10, threshold=1e-04):
 
-        self.de_type = de_type
-        self.de_func = de_func
+        self.func = func
         self.upper = upper
         self.lower = lower
         self.particle_num = particle_num
-        self.param_num = param_num
+        self.param_num = len(param)
         self.max_iter = max_iter
         self.layers_list = layers_list
+        self.params = param
 
         # Initialize particle arrays
         self.X = np.zeros((self.particle_num, self.param_num))
@@ -26,12 +29,11 @@ class DERLPSO(BaseModel):
         self.fit = float('inf')
 
         # Data and time setup
-        self.de_type = str.alpha(de_type)
-        if self.de_type == 'ODE':
+        if isinstance(self.func, ODE_Equation):
             self.initial = data[0, ]
             self.times = times
             self.data = data
-        elif self.de_type == 'PDE':
+        elif isinstance(self.func, PDE_Equation):
             self.data = data
             self.times = None
         else:
@@ -62,12 +64,13 @@ class DERLPSO(BaseModel):
     def get_fit(self):
         return self.fit
 
-    def mse_loss(self, X):
-        if self.de_type == 'ODE':
-            predicted_data = odeint(self.de_func, self.initial, self.times,
-                                    args=tuple(X))
-        elif self.de_type == 'PDE':
-            predicted_data = self.de_func(X)
+    def mse_loss(self, X):# Debugging line to inspect X
+        temp_x = tuple(X),
+        if isinstance(self.func, ODE_Equation):
+            predicted_data = odeint(self.func.f(), self.initial, self.times,
+                                    args=temp_x, tfirst=True)
+        elif isinstance(self.func, PDE_Equation):
+            predicted_data = self.func.f()(X)
 
         mse = np.mean((self.data - predicted_data) ** 2)
         return mse
@@ -153,12 +156,12 @@ class DERLPSO(BaseModel):
                            np.random.choice([-1, 1], self.param_num))
             else:
                 # Uniform initialization
-                if de_type == "ODE":
+                if isinstance(self.func, ODE_Equation):
                     self.X[i] = [np.random.uniform(-self.upper, self.upper)
                             for _ in range(self.param_num)]
                     self.V[i] = [np.random.uniform(-self.upper, self.upper)
                             for _ in range(self.param_num)]
-                elif self.de_type == "PDE":
+                elif isinstance(self.func, PDE_Equation):
                     self.X[i] = [np.uniform(0, self.upper) for _ in range(self.paramNum)]
                     self.V[i] = [np.random.uniform(0, self.upper) for _ in range(self.paramNum)]
             
@@ -259,3 +262,22 @@ class DERLPSO(BaseModel):
                                  max(self.q_table[self.current_state]) -
                                  self.q_table[self.pre_state][self.current_state]))
             self.q_table[self.pre_state][self.current_state] = new_q
+
+
+    def test(self):
+
+        self.init_particles()
+        self.iterator()
+        
+        est_params = np.asarray(self.get_global_best())
+        err = est_params - self.params
+        temp_est_params = tuple(est_params),
+        fit  = odeint(self.func.f(), self.initial, self.times, args=temp_est_params, tfirst=True)
+        mse = mean_squared_error(self.data, fit)
+
+        return {
+                "true_params": self.params,
+                "est_params": est_params.tolist(),
+                "err": err.tolist(),
+                "mse0": mse
+            }
