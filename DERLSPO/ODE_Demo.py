@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.integrate import odeint
 
-from ODE import Model
+from .ODE import Model
 
 a = np.random.normal(0.4, 0.8)
 b = np.random.normal(1.3, 0.8)
