@@ -2,7 +2,7 @@ from .base_model import BaseModel
 from typing import List
 from equations import Equation
 from torch.distributions import Normal, Independent
-from ml_model_components import create_model
+from .ml_model_components import create_model
 
 class MLModel(BaseModel):
     def __init__(self, equation: Equation, init_data: List[float], 
@@ -45,13 +45,13 @@ from pathlib import Path
 
 import time as timer
 from torch.distributions import kl_divergence
-from utils import *
+from .utils import *
 
 import pandas as pd
 import  matplotlib.pyplot as plt
 import torch.optim as optim
 
-from ml_model_components import *
+from .ml_model_components import *
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -514,7 +514,9 @@ def infer(model_path,normal,data_filename,time_filename,param_filename):
 
         print("use model predict successfully")
 def infer_batches(model_paths,data_filename,time_filename,param_filename,ode_func,normal):
-    ode_func = __import__(ode_func, globals(), locals(), ['get_data', 'f'])
+    if isinstance(ode_func, str):
+        ode_func = __import__(ode_func, globals(), locals(), ['get_data', 'f'])
+
     test_dataset = read_data(data_filename, time_filename, param_filename)
 
     test_data = SimpleDataSet(dataset=test_dataset)
@@ -533,11 +535,10 @@ def infer_batches(model_paths,data_filename,time_filename,param_filename,ode_fun
 
     models=[]
 
-
-    model_mlp = torch.load(model_paths[0], map_location=device)
-    model_rnn = torch.load(model_paths[1], map_location=device)
-    model_ode = torch.load(model_paths[2], map_location=device)
-    model_vae = torch.load(model_paths[3], map_location=device)
+    model_mlp = torch.load(model_paths, map_location=device)
+    # model_rnn = torch.load(model_paths[1], map_location=device)
+    # model_ode = torch.load(model_paths[2], map_location=device)
+    # model_vae = torch.load(model_paths[3], map_location=device)
 
     all_param_mlp = None
     all_param_rnn= None
@@ -563,87 +564,90 @@ def infer_batches(model_paths,data_filename,time_filename,param_filename,ode_fun
                 e_time = timer.time()
                 mlp_time=mlp_time+(e_time-s_time)
                 s_time = timer.time()
-                pred_param_rnn = model_rnn.compute(data_encoder, enc_time)
-                e_time = timer.time()
-                rnn_time=rnn_time+(e_time-s_time)
-                s_time = timer.time()
-                pred_param_ode = model_ode.compute(data_encoder, enc_time)
-                e_time = timer.time()
-                ode_time =ode_time+(e_time - s_time)
-                s_time = timer.time()
-                pred_param_vae = model_vae.compute(data_encoder, enc_time)
-                e_time = timer.time()
-                vae_time = vae_time + (e_time - s_time)
+                # pred_param_rnn = model_rnn.compute(data_encoder, enc_time)
+                # e_time = timer.time()
+                # rnn_time=rnn_time+(e_time-s_time)
+                # s_time = timer.time()
+                # pred_param_ode = model_ode.compute(data_encoder, enc_time)
+                # e_time = timer.time()
+                # ode_time =ode_time+(e_time - s_time)
+                # s_time = timer.time()
+                # pred_param_vae = model_vae.compute(data_encoder, enc_time)
+                # e_time = timer.time()
+                # vae_time = vae_time + (e_time - s_time)
 
                 if isinstance(pred_param_mlp, tuple):
                     pred_param_mlp = pred_param_mlp[0]
-                if isinstance(pred_param_rnn, tuple):
-                    pred_param_rnn = pred_param_rnn[0]
-                if isinstance(pred_param_ode, tuple):
-                    pred_param_ode = pred_param_ode[0]
-                if isinstance(pred_param_vae, tuple):
-                    pred_param_vae = pred_param_vae[0]
+                # if isinstance(pred_param_rnn, tuple):
+                #     pred_param_rnn = pred_param_rnn[0]
+                # if isinstance(pred_param_ode, tuple):
+                #     pred_param_ode = pred_param_ode[0]
+                # if isinstance(pred_param_vae, tuple):
+                #     pred_param_vae = pred_param_vae[0]
 
 
-                param_init = np.ones((params.shape[-1]))
-                s_time=timer.time()
-                if normal:
-                    data = data * scale['mult'] + scale['shift']
-                pred_param_math = ode_func.est_param(to_np(time[0, :]), to_np(data), param_init)
-                e_time=timer.time()
-                math_time=math_time+(e_time-s_time)
+                # param_init = np.ones((params.shape[-1]))
+                # s_time=timer.time()
+                # if normal:
+                #     data = data * scale['mult'] + scale['shift']
+                # pred_param_math = ode_func.est_param(to_np(time[0, :]), to_np(data), param_init)
+                # e_time=timer.time()
+                # math_time=math_time+(e_time-s_time)
 
                 all_param_mlp = pred_param_mlp if all_param_mlp is None else torch.cat(
                     (all_param_mlp, pred_param_mlp), dim=0)
-                all_param_rnn = pred_param_rnn if all_param_rnn is None else torch.cat(
-                    (all_param_rnn, pred_param_rnn), dim=0)
-                all_param_ode = pred_param_ode if all_param_ode is None else torch.cat(
-                    (all_param_ode, pred_param_ode), dim=0)
-                all_param_vae = pred_param_vae if all_param_vae is None else torch.cat(
-                    (all_param_vae, pred_param_vae), dim=0)
+                # all_param_rnn = pred_param_rnn if all_param_rnn is None else torch.cat(
+                #     (all_param_rnn, pred_param_rnn), dim=0)
+                # all_param_ode = pred_param_ode if all_param_ode is None else torch.cat(
+                #     (all_param_ode, pred_param_ode), dim=0)
+                # all_param_vae = pred_param_vae if all_param_vae is None else torch.cat(
+                #     (all_param_vae, pred_param_vae), dim=0)
                 all_param=params if all_param is None else torch.cat(
                     (all_param, params), dim=0)
-                all_param_math = pred_param_math if all_param_math is None else torch.cat(
-                    (all_param_math,pred_param_math), dim=0)
+                # all_param_math = pred_param_math if all_param_math is None else torch.cat(
+                #     (all_param_math,pred_param_math), dim=0)
 
 
-
+    
     print('MLP,mse loss:{:.3f},time:{:.3f}'.format( mse_loss(all_param_mlp,all_param),mlp_time))
-    print('RNN,mse loss:{:.3f},time:{:.3f}'.format(mse_loss(all_param_rnn, all_param),rnn_time))
-    print('ODE,mse loss:{:.3f},time:{:.3f}'.format(mse_loss(all_param_ode, all_param),ode_time))
-    print('VAE,mse loss :{:.3f},time:{:.3f}'.format(mse_loss(all_param_vae, all_param),vae_time))
-    print('MATH,mse loss:{:.3f},time:{:.3f}'.format(mse_loss(all_param,to_tensor(all_param_math)).to(device),math_time))
+    # print('RNN,mse loss:{:.3f},time:{:.3f}'.format(mse_loss(all_param_rnn, all_param),rnn_time))
+    # print('ODE,mse loss:{:.3f},time:{:.3f}'.format(mse_loss(all_param_ode, all_param),ode_time))
+    # print('VAE,mse loss :{:.3f},time:{:.3f}'.format(mse_loss(all_param_vae, all_param),vae_time))
+    # print('MATH,mse loss:{:.3f},time:{:.3f}'.format(mse_loss(all_param,to_tensor(all_param_math)).to(device),math_time))
 
     all_param = to_np(all_param)
-    all_param_mlp = to_np(all_param_mlp)
-    all_param_rnn = to_np(all_param_rnn)
-    all_param_ode = to_np(all_param_ode)
-    all_param_vae = to_np(all_param_vae)
+    # all_param_mlp = to_np(all_param_mlp)
+    # all_param_rnn = to_np(all_param_rnn)
+    # all_param_ode = to_np(all_param_ode)
+    # all_param_vae = to_np(all_param_vae)
 
     whole_data=None
 
     for i in range(all_param.shape[0]):
         a=all_param[i,:]
         b=all_param_mlp[i,:]
-        c = all_param_rnn[i, :]
-        d = all_param_ode[i, :]
-        e = all_param_vae[i, :]
-        f = all_param_math[i, :]
+        # c = all_param_rnn[i, :]
+        # d = all_param_ode[i, :]
+        # e = all_param_vae[i, :]
+        # f = all_param_math[i, :]
         tmp=a
         tmp=np.vstack((tmp,b))
-        tmp = np.vstack((tmp, c))
-        tmp = np.vstack((tmp, d))
-        tmp = np.vstack((tmp, e))
-        tmp = np.vstack((tmp, f))
+        # tmp = np.vstack((tmp, c))
+        # tmp = np.vstack((tmp, d))
+        # tmp = np.vstack((tmp, e))
+        # tmp = np.vstack((tmp, f))
 
         whole_data=tmp if whole_data is None else np.vstack((whole_data,tmp))
 
+    
     data_dir = os.path.join(os.path.dirname(data_filename),'compare_param.xlsx')
-    index = ['true', 'mlp', 'rnn', 'ode', 'vae','math'] * all_param.shape[0]
+    index = ['true', 'mlp'] * all_param.shape[0]
+
     df = pd.DataFrame(whole_data,index=index)
     write = pd.ExcelWriter(data_dir)
     df.to_excel(write, 'sheet_1', float_format='%.3f')
     write.close()
+    
 
 
 
@@ -706,18 +710,17 @@ def write_excel(save_path,all_param,all_param_model):
 import sys
 from pathlib import Path
 
-from interface import run_param
-
 import numpy as np
 import os
 
 
 def simulation(configure_file, dim_of_data, num_of_param, param_mu, param_sigma, with_noise, conv_rho, conv_sigma,
                time_interval, init_data, ode_func, data_nums, data_filename, time_filename, param_filename):
-    ode_func = __import__(ode_func, globals(), locals(), ['get_data', 'f'])
+    if isinstance(ode_func, str):
+        ode_func = __import__(ode_func, globals(), locals(), ['get_data', 'f'])
     t_start, t_end, time_points = time_interval[0], time_interval[1], time_interval[2]
     time = np.arange(t_start, t_end, step=(t_end - t_start) / time_points)
-    run_param.generate_param_data(data_nums, param_mu, param_sigma, dim_of_data,time, with_noise, conv_rho,
+    generate_param_data(data_nums, param_mu, param_sigma, dim_of_data,time, with_noise, conv_rho,
                                   conv_sigma, init_data, data_filename, time_filename, param_filename, ode_func)
 
 
@@ -731,8 +734,8 @@ def train_model(configure_file,base_dir, dim_of_data, num_of_param, data_filenam
         os.makedirs(os.path.dirname(log_path))
     logger = get_logger(logpath=log_path, filepath=os.path.abspath(__file__))
 
-    data = run_param.read_data(data_filename, time_filename, param_filename)
-    run_param.train_with_data(configs_param, base_dir,num_of_param, dim_of_data, data)
+    data = read_data(data_filename, time_filename, param_filename)
+    train_with_data(configs_param, base_dir,num_of_param, dim_of_data, data)
 
 
 
@@ -745,4 +748,22 @@ def predict_param(model_path, normal,data_filename, time_filename):
     :return:
     '''
 
-    run_param.predict(model_path, data_filename, time_filename)
+    predict(model_path, data_filename, time_filename)
+
+
+def read_data(data_filename,time_filename,param_filename=None):
+    time = pd.read_csv(time_filename, delimiter=',').values
+    time_points = time.shape[-1]
+    data = pd.read_csv(data_filename, delimiter=',').values
+    data = data.reshape(data.shape[0], time_points, -1)
+    data_dict = {
+        'data': data,
+        # 'u_samples': None,
+        # 'params': params,
+        'time': time}
+    if param_filename is not None:
+        params = pd.read_csv(param_filename, delimiter=',').values
+        params=params.reshape(data.shape[0],-1)
+        data_dict['params']=params
+
+    return data_dict

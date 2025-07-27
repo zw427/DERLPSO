@@ -8,7 +8,7 @@ import pandas as pd
 from data import generate_data, read_data
 from equations import ODE_Equation
 from models.base_model import BaseModel
-from models.ml_models import MLModel
+from models.ml_models import MLModel, infer_batches, train_model
 
 from models.DERLPSO import DERLPSO
 
@@ -82,9 +82,16 @@ class ODE_Models:
         ### evaluate here
         for m in models:
             for point in points:
+                if issubclass(m, MLModel):
+                    data_file, time_file, param_file, model_dir = self.get_filenames(interval, point, train=True)
+                
+                    configs = self.equation.configs
+                    train_model(configs, model_dir, len(self.init_data), len(self.param_mu), data_file, time_file, param_file, self.equation.f(), m.__name__)
 
-                if isinstance(m, MLModel):
-                    pass
+                    data_file, time_file, param_file, model_dir = self.get_filenames(interval, point, train=False)
+
+                    model_paths = model_dir + "/" + m.__name__+ "/" + "checkpoints/entire.pth"
+                    infer_batches(model_paths, data_file, time_file, param_file, self.equation.f(), False)
 
                 elif m == DERLPSO:
                     data_file, time_file, param_file, _ = self.get_filenames(interval, point, train=False)
