@@ -1,8 +1,8 @@
 # ignore generated outputs
 saved_models/
 data/
-predictions/
-summary/
+results/
+
 .DS_Store
 .vscode
 
