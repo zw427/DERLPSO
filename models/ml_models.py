@@ -2,15 +2,19 @@ from .base_model import BaseModel
 from typing import List
 from equations import Equation
 from torch.distributions import Normal, Independent
-from .ml_model_components import create_model
+from .ml_model_components.create_model import create_model
 
 class MLModel(BaseModel):
-    def __init__(self, equation: Equation, init_data: List[float], 
-                 param_mu: List[float], param_sigma: List[float]):
-        super().__init__(equation, init_data, param_mu, param_sigma)
-        self.model = None  # Placeholder for the ML model
-        self.optimizer = None  # Placeholder for the optimizer
-        self.loss_function = None  # Placeholder for the loss function
+    def __init__(self):
+        raise NotImplementedError("MLModel is an abstract base class and cannot be instantiated directly.")
+    
+    def train(self):
+        pass
+
+    def predict(self):
+        pass 
+
+
 
 class MLP(MLModel):
     def __init__(self, equation, init_data, param_mu, param_sigma):
@@ -58,61 +62,20 @@ from torch.utils.tensorboard import SummaryWriter
 
 
 
-#生成指定分布数据
-def generate_param_data(batches,mu,sigma,dim_of_data,t,with_noise=True,conv_rho=[0.8,0.1],conv_sigma=[0.2,0.1],init_data=None,data_filename=None,time_filename=None,param_filename=None,f=None):
-    """save data，each  param have t setp data"""
-    if data_filename is not None and not os.path.exists(data_filename):
-            os.makedirs(os.path.dirname(data_filename))
 
-    all_data_noise = None
-    all_data = None
-    all_param=None
-    all_time=None
+def train_model(configure_file,base_dir, dim_of_data, num_of_param, data_filename, time_filename, param_filename, ode_func,model_type):
+    if isinstance(ode_func, str):
+        ode_func = __import__(ode_func, globals(), locals(), ['get_data', 'f'])
 
-    i=0
+    configs_param = load_configure(configure_file,model_type)
+    log_path = '{}/{}/{}'.format(base_dir,configs_param['type'], "train_model.log")
+    if not os.path.exists(os.path.dirname(log_path)):
+        os.makedirs(os.path.dirname(log_path))
+    logger = get_logger(logpath=log_path, filepath=os.path.abspath(__file__))
 
-    while i<batches:
+    data = read_data(data_filename, time_filename, param_filename)
+    train_with_data(configs_param, base_dir,num_of_param, dim_of_data, data)
 
-        success,train_data=f.get_one_data(mu,sigma,dim_of_data,t,with_noise=with_noise,conv_rho=conv_rho,init_data=init_data,conv_sigma=conv_sigma,f=f.f)
-        if success:
-
-            t_data, t_data_noise, t_param, t_time=train_data[0],train_data[1],train_data[2],train_data[3]
-            i=i+1
-        else:
-            print("continue=========")
-            continue
-
-        all_data=t_data if all_data is None else np.concatenate((all_data,t_data),axis=0)
-        all_data_noise = t_data_noise if all_data_noise is None else np.concatenate((all_data_noise, t_data_noise), axis=0)
-        all_param = t_param if all_param is None else np.concatenate((all_param, t_param), axis=0)
-        all_time=t_time if all_time is None else np.concatenate((all_time,t_time),axis=0)
-
-
-
-    dataset = {
-            'data': all_data_noise if with_noise else all_data,
-            'u_samples': np.repeat(np.concatenate((mu,sigma),axis=-1).reshape((1,-1)),all_time.shape[0],axis=0),
-            'params': all_param,
-            'time': all_time}
-    if data_filename is not None :
-        if with_noise:
-            all_data_noise = all_data_noise.reshape(all_data_noise.shape[0], -1)
-        all_data = all_data.reshape(all_data.shape[0], -1)
-        all_param = all_param.reshape(all_param.shape[0], -1)
-        all_time = all_time.reshape(all_time.shape[0], -1)
-
-        # saving reshaped array to file.
-        if with_noise:
-            header_data = ",".join(['d_{}'.format(i) for i in range(all_data_noise.shape[-1])])
-        else:
-            header_data = ",".join(['d_{}'.format(i) for i in range(all_data.shape[-1])])
-        headet_param= ",".join(['p_{}'.format(i) for i in range(all_param.shape[-1])])
-        header_time = ",".join(['t_{}'.format(i) for i in range(all_time.shape[-1])])
-        np.savetxt(data_filename, all_data_noise if with_noise else all_data, header=header_data,delimiter=',')
-        np.savetxt(param_filename, all_param, header=headet_param,delimiter=',')
-        np.savetxt(time_filename, all_time, header=header_time,delimiter=',')
-    print('=========================data generate successfully!================================')
-    return dataset
 
 def read_data(data_filename,time_filename,param_filename=None):
     time = pd.read_csv(time_filename, delimiter=',').values
@@ -130,6 +93,7 @@ def read_data(data_filename,time_filename,param_filename=None):
         data_dict['params']=params
 
     return data_dict
+
 
 def train_with_data(configs,base_dir,num_of_param,dim_of_data,data):
 
@@ -155,7 +119,7 @@ def train_with_data(configs,base_dir,num_of_param,dim_of_data,data):
 
 
 def train(configs,base_dir,train_dataset,val_dataset,num_of_param,dim_of_data,time_points):
-    model=create_model.create_model(configs,num_of_param,dim_of_data,time_points,configs['type'])
+    model== create_model(configs['Net'],num_of_param,dim_of_data,time_points,configs['type'], configs['device'])
     device = torch.device(configs['device'] if torch.cuda.is_available() else 'cpu')
     writer = SummaryWriter(log_dir='{}/{}'.format(base_dir,configs['type']))
 
@@ -413,7 +377,7 @@ def train(configs,base_dir,train_dataset,val_dataset,num_of_param,dim_of_data,ti
         writer.close()
 
 
-
+# inference
 def predict(model_path,data_filename,time_filename,normal=True,save_dir=None):
     test_dataset=read_data(data_filename,time_filename) 
     if save_dir is None:
@@ -459,60 +423,7 @@ def predict(model_path,data_filename,time_filename,normal=True,save_dir=None):
             print("use model predict successfully")
 
 
-def infer(model_path,normal,data_filename,time_filename,param_filename):
-    #configs= load_configure(configure_file,model_type)
-    test_dataset = read_data(data_filename, time_filename,param_filename)
-
-    num_val_batches = 1024
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
-    test_data = SimpleDataSet(dataset=test_dataset)
-    model = torch.load(model_path, map_location=device)
-
-
-    # 归一化
-    if normal:
-        test_data.preprocess_data()
-    dataset = prepare_data(test_data, b_train=num_val_batches)
-    all_param_model = None
-    all_param=None
-
-    with torch.no_grad():
-
-        for step, (data,params,u_samples,time) in enumerate(dataset):
-
-            result = {}
-            data_encoder = data.to(device)
-            enc_time = time[0, :].to(device)
-
-            start = timer.time()
-            pred_param = model.compute(data_encoder, enc_time)
-            if isinstance(pred_param, tuple):
-                pred_param = pred_param[0]
-            end = timer.time()
-            result['test_model_time'] = (end - start)
-
-            all_param_model = pred_param if all_param_model is None else torch.cat(
-                (all_param_model, pred_param), dim=0)
-            all_param=params if all_param is None else torch.cat(
-                (all_param, params), dim=0)
-        print('mse loss:{}'.format(mse_loss(all_param_model,all_param)))
-
-
-        all_param=to_np(all_param)
-        all_param_model=to_np(all_param_model)
-        plt.figure()
-        for i in range(all_param.shape[1]):
-            plt.subplot(all_param.shape[1],1,i+1)
-            plt.xlim(np.min(all_param[:,i]),np.max(all_param[:,i]))
-            plt.ylim(np.min(all_param_model[:,i]),np.max(all_param_model[:,i]))
-            plt.scatter(all_param[:,i],all_param_model[:,i])
-            plt.xlabel("true param")
-            plt.ylabel("pred param")
-        plt.show()
-
-
-        print("use model predict successfully")
+# inference
 def infer_batches(model_paths,data_filename,time_filename,param_filename,ode_func,normal):
     if isinstance(ode_func, str):
         ode_func = __import__(ode_func, globals(), locals(), ['get_data', 'f'])
@@ -651,6 +562,8 @@ def infer_batches(model_paths,data_filename,time_filename,param_filename,ode_fun
 
 
 
+
+# write output and summary
 def write_excel(save_path,all_param,all_param_model):
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -707,63 +620,4 @@ def write_excel(save_path,all_param,all_param_model):
 
 
 
-import sys
-from pathlib import Path
 
-import numpy as np
-import os
-
-
-def simulation(configure_file, dim_of_data, num_of_param, param_mu, param_sigma, with_noise, conv_rho, conv_sigma,
-               time_interval, init_data, ode_func, data_nums, data_filename, time_filename, param_filename):
-    if isinstance(ode_func, str):
-        ode_func = __import__(ode_func, globals(), locals(), ['get_data', 'f'])
-    t_start, t_end, time_points = time_interval[0], time_interval[1], time_interval[2]
-    time = np.arange(t_start, t_end, step=(t_end - t_start) / time_points)
-    generate_param_data(data_nums, param_mu, param_sigma, dim_of_data,time, with_noise, conv_rho,
-                                  conv_sigma, init_data, data_filename, time_filename, param_filename, ode_func)
-
-
-def train_model(configure_file,base_dir, dim_of_data, num_of_param, data_filename, time_filename, param_filename, ode_func,model_type):
-    if isinstance(ode_func, str):
-        ode_func = __import__(ode_func, globals(), locals(), ['get_data', 'f'])
-
-    configs_param = load_configure(configure_file,model_type)
-    log_path = '{}/{}/{}'.format(base_dir,configs_param['type'], "train_model.log")
-    if not os.path.exists(os.path.dirname(log_path)):
-        os.makedirs(os.path.dirname(log_path))
-    logger = get_logger(logpath=log_path, filepath=os.path.abspath(__file__))
-
-    data = read_data(data_filename, time_filename, param_filename)
-    train_with_data(configs_param, base_dir,num_of_param, dim_of_data, data)
-
-
-
-def predict_param(model_path, normal,data_filename, time_filename):
-    '''
-    :param configure_file: 配置文件路径
-    :param data_filename:  预测数据路径
-    :param time_filename
-    :param output_path
-    :return:
-    '''
-
-    predict(model_path, data_filename, time_filename)
-
-
-def read_data(data_filename,time_filename,param_filename=None):
-    time = pd.read_csv(time_filename, delimiter=',').values
-    time_points = time.shape[-1]
-    data = pd.read_csv(data_filename, delimiter=',').values
-    data = data.reshape(data.shape[0], time_points, -1)
-    data_dict = {
-        'data': data,
-        # 'u_samples': None,
-        # 'params': params,
-        'time': time}
-    if param_filename is not None:
-        params = pd.read_csv(param_filename, delimiter=',').values
-        params=params.reshape(data.shape[0],-1)
-        data_dict['params']=params
-
-    return data_dict

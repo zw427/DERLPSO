@@ -1,3 +1,9 @@
+###########################
+# Latent ODEs for Irregularly-Sampled Time Series
+# Author: Yulia Rubanova
+# Source: https://github.com/YuliaRubanova/latent_ode/blob/master/lib/diffeq_solver.py
+###########################
+
 import torch
 import torch.nn as nn
 from torchdiffeq import odeint as odeint
@@ -5,13 +11,13 @@ from torchdiffeq import odeint as odeint
 #####################################################################################################
 
 class DiffeqSolver(nn.Module):
-	def __init__(self,ode_func, method,
-			odeint_rtol = 1e-4, odeint_atol = 1e-5, device = torch.device("cpu")):
+	def __init__(self, ode_func, method, odeint_rtol = 1e-4, 
+			  odeint_atol = 1e-5, device = torch.device("cpu")):
 		super(DiffeqSolver, self).__init__()
 
 		self.ode_method = method
-		self.device = device
 		self.ode_func = ode_func
+		self.device = device
 
 		self.odeint_rtol = odeint_rtol
 		self.odeint_atol = odeint_atol
@@ -22,13 +28,11 @@ class DiffeqSolver(nn.Module):
 		"""
 		n_traj_samples, n_traj = first_point.size()[0], first_point.size()[1]
 
-
 		pred_y = odeint(self.ode_func, first_point, time_steps_to_predict,rtol=self.odeint_rtol, atol=self.odeint_atol, method = self.ode_method)
 		pred_y = pred_y.permute(1,2,0)
 
-
-
 		assert(torch.mean(pred_y[:, :, 0]  - first_point) < 0.001)
+		assert(pred_y.size()[0] == n_traj_samples)
 		assert(pred_y.size()[1] == n_traj)
 
 		return pred_y
@@ -47,5 +51,3 @@ class DiffeqSolver(nn.Module):
 		# shape: [n_traj_samples, n_traj, n_tp, n_dim]
 		pred_y = pred_y.permute(1,2,0,3)
 		return pred_y
-
-

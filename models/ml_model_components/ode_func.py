@@ -1,16 +1,16 @@
 ###########################
 # Latent ODEs for Irregularly-Sampled Time Series
 # Author: Yulia Rubanova
+# Source: https://github.com/YuliaRubanova/latent_ode/blob/master/lib/ode_func.py
 ###########################
 
 import torch
 import torch.nn as nn
 
-
 #####################################################################################################
 
 class ODEFunc(nn.Module):
-	def __init__(self, input_dim,ode_func_net, device = torch.device("cpu")):
+	def __init__(self, input_dim, ode_func_net, device = torch.device("cpu")):
 		"""
 		input_dim: dimensionality of the input
 		latent_dim: dimensionality used for ODE. Analog of a continous latent state
@@ -46,8 +46,3 @@ class ODEFunc(nn.Module):
 		y: value at the current time point
 		"""
 		return self.get_ode_gradient_nn(t_local, y)
-
-
-
-
-

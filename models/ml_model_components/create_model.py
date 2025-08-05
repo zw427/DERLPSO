@@ -1,123 +1,193 @@
-from ..utils import *
-from . import Base_param
-from . import Base_rnn
-from . import param_model
-from .diffeq_solver import *
-from .ode_func import *
+"""
+Model factory for creating various neural network architectures.
+"""
+import torch 
+import torch.nn as nn
+
+from models.ml_model_components.diffeq_solver import DiffeqSolver
+from models.ml_model_components.encoder_decoder import VAE_ODE_RNN, VAE_RNN, RNN, ODE_RNN, MLP, DecoderMLP, DecoderODE_RNN
+from models.ml_model_components.model_utils import create_net, build_modules
+from models.ml_model_components.ode_func import ODEFunc
+from models.ml_model_components.parameter_estimators import VAE, EncoderDecoder, Base
 
 
+def create_model(net_configs: dict, num_of_param: int, dim_of_data: int, 
+                 time_points: int, model_type: str, device: torch.device):
+    """
+    Factory function to create different types of neural network models.
+    
+    Args:
+        net_configs: Configuration dictionary for network architecture. See models/configs for examples.
+        num_of_param: Number of parameters to estimate
+        dim_of_data: Dimension of input data
+        time_points: Number of time points in the sequence
+        model_type: Type of model to create ('vae', 'ode_rnn', 'rnn', 'mlp')
+        device: PyTorch device to place models on
+        
+    Returns:
+        Configured neural network model
+    """
+    model_type = model_type.lower()
+    latent_dim = net_configs['latent_dim']
 
-def create_model(configs,num_of_param,dim_of_data,time_points,model_type):
-    type = model_type.lower()
-    device = torch.device(configs['device'] if torch.cuda.is_available() else 'cpu')
-    cfg=configs['Net']
-    latent_dim = cfg['latent_dim']
+    if model_type == 'vae':
+        # ===== VAE Model Configuration =====
+        decoder_input_dim, decoder_output_dim = latent_dim, num_of_param
 
-    if type =='vae':
-            encoder=None
-            d_input_dim, d_output_dim = latent_dim, num_of_param
-            hidden_dims = list(cfg['decoder']['model_hidden_size'])
-            hidden_dims.insert(0, d_input_dim)
-            hidden_dims.append(d_output_dim)
-            act_func = cfg['decoder']['model_nonlinearity']
-            mlp = build_modules(hidden_dims, act_func,False)
-            if cfg['encoder']['type']=='ODE':
+        # Configure transformation layer
+        hidden_dims = list(net_configs['decoder']['model_hidden_size'])
+        hidden_dims = [decoder_input_dim] + hidden_dims + [decoder_output_dim]
+        activation_function = net_configs['decoder']['model_nonlinearity']
+        transform = build_modules(hidden_dims, activation_function, False)
 
-                ode_func_net = create_net(latent_dim,
-                                                latent_dim,
-                                                n_layers=cfg['encoder']["ode_layers"],
-                                                n_units=cfg['encoder']['ode_unit'],
-                                                nonlinear=nn.ELU, drop=False)
-                ode_func = ODEFunc(
-                    input_dim=latent_dim,
-                    ode_func_net=ode_func_net,
-                    device=device).to(device)
-                diffeq_solver = DiffeqSolver(ode_func, "euler", odeint_rtol = 1e-3, odeint_atol = 1e-5, device = device)
+        # ----- Encoder Configuration -----
+        if net_configs['encoder']['type'] == 'ODE':
+            # ODE-based encoder
+            ode_func_net = create_net(
+                latent_dim, latent_dim,
+                n_layers=net_configs['encoder']["ode_layers"],
+                n_units=net_configs['encoder']['ode_unit'],
+                nonlinear=nn.ELU, drop=False
+            )
+            ode_func = ODEFunc(
+                input_dim=latent_dim,
+                ode_func_net=ode_func_net,
+                device=device
+            ).to(device)
+            
+            diffeq_solver = DiffeqSolver(
+                ode_func, "euler", 
+                odeint_rtol=1e-3, odeint_atol=1e-5, 
+                device=device
+            )
 
-                encoder=param_model.VAE_ODE_RNN(latent_dim,dim_of_data,diffeq_solver,n_gru_units = cfg['encoder']["gru_unit"], device = device).to(device)
+            encoder = VAE_ODE_RNN(
+                latent_dim, dim_of_data, diffeq_solver, 
+                n_GRUUnits=net_configs['encoder']["gru_unit"], 
+                device=device
+            ).to(device)
 
-            elif cfg['encoder']['type']=='RNN':
+        elif net_configs['encoder']['type'] == 'RNN':
+            # RNN-based encoder
+            encoder = VAE_RNN(
+                latent_dim, dim_of_data, GRU_update=None, 
+                n_GRUUnits=net_configs['encoder']["gru_unit"], 
+                device=device
+            ).to(device)
 
-                    encoder = param_model.VAE_RNN(latent_dim, dim_of_data, GRU_update=None, n_gru_units=cfg['encoder']["gru_unit"], device=device).to(device)
+        # ----- Decoder Configuration -----
+        if net_configs['decoder']['type'] == 'ODE':
 
-            if cfg['decoder']['type']=='ODE':
-                d_input=d_output_dim
-                ode_func_net = create_net(d_input,
-                                                d_input,
-                                                n_layers=cfg['decoder']["ode_layers"],
-                                                n_units=cfg['decoder']['ode_unit'],
-                                                nonlinear=nn.ELU, drop=False)
-                ode_func = ODEFunc(
-                    input_dim=d_input,
-                    ode_func_net=ode_func_net,
-                    device=device).to(device)
-                diffeq_solver = DiffeqSolver(ode_func, "euler", odeint_rtol=1e-3, odeint_atol=1e-5, device=device)
+            # ODE-based decoder
+            decoder_input_dim = decoder_output_dim
+            ode_func_net = create_net(
+                decoder_input_dim, decoder_input_dim,
+                n_layers=net_configs['decoder']["ode_layers"],
+                n_units=net_configs['decoder']['ode_unit'],
+                nonlinear=nn.ELU, drop=False
+            )
+            ode_func = ODEFunc(
+                input_dim=decoder_input_dim,
+                ode_func_net=ode_func_net,
+                device=device
+            ).to(device)
+            
+            diffeq_solver = DiffeqSolver(
+                ode_func, "euler", 
+                odeint_rtol=1e-3, odeint_atol=1e-5, 
+                device=device
+            )
 
-                decoder=param_model.model_ode_rnn(d_output_dim,dim_of_data, d_output_dim, diffeq_solver,
-                                                  n_gru_units=cfg['decoder']["gru_unit"], device=device).to(device)
+            decoder = DecoderODE_RNN(
+                decoder_output_dim, dim_of_data, decoder_output_dim, diffeq_solver,
+                n_GRUUnits=net_configs['decoder']["gru_unit"], 
+                device=device
+            ).to(device)
 
-            elif cfg['decoder']['type']=='RNN':
+        elif net_configs['decoder']['type'] == 'RNN':
+            # RNN-based decoder
+            # ERROR: Why does decoder have the shape: decoder_output_dim --> decoder_output_dim?
+            decoder = RNN(
+                decoder_output_dim, decoder_output_dim, GRU_update=None,
+                n_GRUUnits=net_configs['decoder']["gru_unit"], 
+                device=device
+            )
 
+        return VAE(encoder, decoder, transform)
 
-
-                decoder=param_model.RNN(d_output_dim, d_output_dim, GRU_update=None,
-                                          n_gru_units=cfg['decoder']["gru_unit"], device=device)
-
-
-
-
-
-            model=Base_param.VAE(encoder,mlp,decoder)
-
-    elif type=='ode_rnn':
+    elif model_type == 'ode_rnn':
+        # ===== ODE-RNN Model Configuration =====
         latent_dim = dim_of_data
-        ode_func_net = create_net(latent_dim,
-                                        latent_dim,
-                                        n_layers=cfg["ode_layers"],
-                                        n_units=cfg['ode_unit'],
-                                        nonlinear=nn.ELU, drop=False).to(device)
+
+        # ----- Encoder Configuration -----
+        ode_func_net = create_net(
+            latent_dim, latent_dim,
+            n_layers=net_configs["ode_layers"],
+            n_units=net_configs['ode_unit'],
+            nonlinear=nn.ELU, drop=False
+        ).to(device)
+        
         ode_func = ODEFunc(
             input_dim=latent_dim,
             ode_func_net=ode_func_net,
-            device=device).to(device)
-        diffeq_solver = DiffeqSolver(ode_func, "euler", odeint_rtol=1e-6, odeint_atol=1e-8, device=device)
+            device=device
+        ).to(device)
+        
+        diffeq_solver = DiffeqSolver(
+            ode_func, "euler", 
+            odeint_rtol=1e-6, odeint_atol=1e-8, 
+            device=device
+        )
 
-        model2_input_dim = time_points * dim_of_data+latent_dim
-        model2_out_dim = num_of_param
-        hidden_dims = list([5,5])
-        hidden_dims.insert(0, model2_input_dim)
-        hidden_dims.append(model2_out_dim)
-        model2 = build_modules(hidden_dims, 'elu',False)
+        encoder = ODE_RNN(
+            latent_dim, dim_of_data, diffeq_solver, 
+            GRU_update=None, n_GRUUnits=20, 
+            device=device
+        )
 
-        encoder=param_model.ODE_RNN(latent_dim,dim_of_data,diffeq_solver,GRU_update=None,n_gru_units=20,device=device)
+        # ----- Decoder Configuration -----
+        decoder_input_dim = latent_dim + time_points * dim_of_data
+        decoder_output_dim = num_of_param
+        hidden_dims = [decoder_input_dim, 5, 5, decoder_output_dim]
+        
+        decoder = DecoderMLP(build_modules(hidden_dims, 'elu', False))
 
-        decoder = param_model.model_mlp(model2)
+        return EncoderDecoder(encoder, decoder)
 
-        model = Base_param.Encoder_Decoder(encoder, decoder)
-    elif type=='mlp':
-
-        input_dim, output_dim=time_points * dim_of_data, num_of_param
-        hidden_dims=list(cfg['model_hidden_size'])
-        hidden_dims.insert(0,input_dim)
-        hidden_dims.append(output_dim)
-        act_func= cfg['model_nonlinearity']
-        mlp=param_model.MLP(hidden_dims,act_func)
-        model=Base_param.Base(mlp)
-
-    elif type=='rnn':
+    elif model_type == 'rnn':
+        # ===== RNN Model Configuration =====
         latent_dim = num_of_param
-        # + configs['Data']['num_of_sigma'] + configs['Data']['num_of_rho']
-        encoder =  param_model.RNN(latent_dim, dim_of_data, GRU_update=None, n_gru_units=cfg["gru_unit"], device=device)
-        model2_input_dim=latent_dim+time_points*dim_of_data
-        model2_out_dim=num_of_param
-        hidden_dims = list([5,5])
-        hidden_dims.insert(0, model2_input_dim)
-        hidden_dims.append(model2_out_dim)
-        model2=build_modules(hidden_dims,'elu')
-        decoder=param_model.model_mlp(model2)
 
+        # ----- Encoder Configuration -----
+        encoder = RNN(
+            latent_dim, dim_of_data, GRU_update=None, 
+            n_GRUUnits=net_configs["gru_unit"], 
+            device=device
+        )
 
-        model = Base_param.Encoder_Decoder(encoder, decoder)
+        # ----- Decoder Configuration -----
+        decoder_input_dim = latent_dim + time_points * dim_of_data
+        decoder_output_dim = num_of_param
+        hidden_dims = [decoder_input_dim, 5, 5, decoder_output_dim]
 
-    return model
-#
+        decoder = DecoderMLP(build_modules(hidden_dims, 'elu'))
+
+        return EncoderDecoder(encoder, decoder)
+    
+    elif model_type == 'mlp':
+        # ===== MLP Model Configuration =====
+        activation_function = net_configs['model_nonlinearity']
+
+        input_dim = time_points * dim_of_data
+        output_dim = num_of_param
+        hidden_dims = list(net_configs['model_hidden_size'])
+        hidden_dims = [input_dim] + hidden_dims + [output_dim]
+        
+        mlp = MLP(hidden_dims, activation_function)
+
+        return Base(mlp)
+
+    else:
+        raise ValueError(f"Unknown model type: {model_type}. Supported types: 'vae', 'ode_rnn', 'rnn', 'mlp'")
+
+    # you may add more models if you wish
