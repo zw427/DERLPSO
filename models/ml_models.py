@@ -1,99 +1,86 @@
 from .base_model import BaseModel
-from typing import List
+from typing import List, Optional
 from equations import Equation
 from torch.distributions import Normal, Independent
 from .ml_model_components.create_model import create_model
+import pandas as pd
+from data import read_data
 
-class MLModel(BaseModel):
-    def __init__(self):
-        raise NotImplementedError("MLModel is an abstract base class and cannot be instantiated directly.")
-    
-    def train(self):
-        pass
-
-    def predict(self):
-        pass 
-
-
-
-class MLP(MLModel):
-    def __init__(self, equation, init_data, param_mu, param_sigma):
-        super().__init__(equation, init_data, param_mu, param_sigma)
-        # Initialize MLP specific attributes here
-        self.hidden_layers = []  # Placeholder for hidden layers
-        self.output_layer = None  # Placeholder for output layer
-
-class RNN(MLModel):
-    def __init__(self, equation, init_data, param_mu, param_sigma):
-        super().__init__(equation, init_data, param_mu, param_sigma)
-        # Initialize RNN specific attributes here
-        self.hidden_state = None  # Placeholder for hidden state
-
-class ODE_RNN(MLModel):
-    def __init__(self, equation, init_data, param_mu, param_sigma):
-        super().__init__(equation, init_data, param_mu, param_sigma)
-        # Initialize ODE_RNN specific attributes here
-        self.ode_solver = None  # Placeholder for ODE solver
-
-class VAE(MLModel):
-    def __init__(self, equation, init_data, param_mu, param_sigma):
-        super().__init__(equation, init_data, param_mu, param_sigma)
-        # Initialize VAE specific attributes here
-        self.encoder = None  # Placeholder for encoder
-        self.decoder = None  # Placeholder for decoder
-        self.latent_dim = None  # Placeholder for latent dimension size
-    
-
-import sys
-from pathlib import Path
-
+import os
 import time as timer
 from torch.distributions import kl_divergence
 from .utils import *
 
-import pandas as pd
-import  matplotlib.pyplot as plt
 import torch.optim as optim
-
 from .ml_model_components import *
-
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
 
+class MLModel(BaseModel):
+    def __init__(self, model_type: str, num_of_param: int, dim_of_data: int,
+                 time_points: int, config: str, model_path: Optional[str] = None):
+        """
+        Initialize ML Model with configuration and model creation.
+        
+        Args:
+            model_type: Type of model ('MLP', 'RNN', 'ODE_RNN', 'VAE', etc)
+            num_of_param: Number of parameters to predict
+            dim_of_data: Dimensionality of input data
+            time_points: Number of time points in sequences
+            config: Path to configuration file
+            model_path: Path to pre-trained model (optional)
+        """
+        super().__init__()
+        
+        # Store basic attributes
+        self.model_type = model_type
+        self.num_of_param = num_of_param
+        self.dim_of_data = dim_of_data
+        self.time_points = time_points
+        
+        # Load configuration
+        self.config = load_configure(config, model_type)
+        
+        # Set device
+        self.device = torch.device(self.config['device'])
+        
+        # Extract configuration parameters
+        net_config = self.config['Net']
+        self.normal = net_config['normal']
+        self.max_epoch = net_config['max_epochs']
+        self.load = net_config['load']
+        self.learning_rate = float(net_config['learning_rate'])
+        self.train_ite = net_config['train_ite']
+        self.save_epoch = net_config['save_epoch']
+        self.eval_epoch = net_config['eval_epoch']
+        self.train_batch_size = net_config['train_batch_size']
+        self.val_batch_size = net_config['eval_batch_size']
+        
+        # Initialize model
+        if model_path:
+            self.model = torch.load(model_path, map_location=self.device)
+        else:
+            self.model = create_model(
+                net_config, num_of_param, dim_of_data, 
+                time_points, model_type, self.device
+            ).to(self.device)
+    
+    def train(self, ):
+        pass
 
 
-def train_model(configure_file,base_dir, dim_of_data, num_of_param, data_filename, time_filename, param_filename, ode_func,model_type):
-    if isinstance(ode_func, str):
-        ode_func = __import__(ode_func, globals(), locals(), ['get_data', 'f'])
 
-    configs_param = load_configure(configure_file,model_type)
-    log_path = '{}/{}/{}'.format(base_dir,configs_param['type'], "train_model.log")
+
+def train_model(configure_file,base_dir, data_filename, time_filename, param_filename):
+
+
     if not os.path.exists(os.path.dirname(log_path)):
         os.makedirs(os.path.dirname(log_path))
     logger = get_logger(logpath=log_path, filepath=os.path.abspath(__file__))
 
     data = read_data(data_filename, time_filename, param_filename)
     train_with_data(configs_param, base_dir,num_of_param, dim_of_data, data)
-
-
-def read_data(data_filename,time_filename,param_filename=None):
-    time = pd.read_csv(time_filename, delimiter=',').values
-    time_points = time.shape[-1]
-    data = pd.read_csv(data_filename, delimiter=',').values
-    data = data.reshape(data.shape[0], time_points, -1)
-    data_dict = {
-        'data': data,
-        # 'u_samples': None,
-        # 'params': params,
-        'time': time}
-    if param_filename is not None:
-        params = pd.read_csv(param_filename, delimiter=',').values
-        params=params.reshape(data.shape[0],-1)
-        data_dict['params']=params
-
-    return data_dict
-
 
 def train_with_data(configs,base_dir,num_of_param,dim_of_data,data):
 
@@ -104,7 +91,10 @@ def train_with_data(configs,base_dir,num_of_param,dim_of_data,data):
     all_data=data['data']
     all_time = data['time']
     all_param= data['params']
+
     train_dict,test_dict=split_data(all_data,all_time,all_param,train_fraq=0.6)
+
+    
     train_data_comm = SimpleDataSet(train_dict)
     test_data_comm = SimpleDataSet(test_dict)
 
@@ -113,6 +103,7 @@ def train_with_data(configs,base_dir,num_of_param,dim_of_data,data):
         train_data_comm.preprocess_data()
         test_data_comm.preprocess_data()
     # 装载数据
+
     train_dataset = prepare_data(train_data_comm, b_train=num_train_batches)
     test_dataset = prepare_data(test_data_comm, b_train=num_test_batches)
     train(configs, base_dir,train_dataset, test_dataset,num_of_param,dim_of_data,time_points)
@@ -377,247 +368,144 @@ def train(configs,base_dir,train_dataset,val_dataset,num_of_param,dim_of_data,ti
         writer.close()
 
 
-# inference
-def predict(model_path,data_filename,time_filename,normal=True,save_dir=None):
-    test_dataset=read_data(data_filename,time_filename) 
-    if save_dir is None:
-        save_dir=os.path.dirname(data_filename)
-    model = torch.load(model_path)
-    num_val_batches = 1024
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    test_data = SimpleDataSet(dataset=test_dataset)
-
-    # 归一化
-    if normal:
-        test_data.preprocess_data()
-    dataset = prepare_data(test_data, b_train=num_val_batches)
-    all_param_model = None
-
-    with torch.no_grad():
-
-
-            for step, (data,params,u_samples, time) in enumerate(dataset):
-
-                result = {}
-                data_encoder = data.to(device)
-                enc_time = time[0,:].to(device)
-
-
-                start = timer.time()
-                pred_param= model.compute(data_encoder, enc_time)
-                if isinstance(pred_param,tuple):
-                    pred_param=pred_param[0]
-                end = timer.time()
-                result['test_model_time'] = (end - start)
-
-
-
-                all_param_model = pred_param if all_param_model is None else torch.cat(
-                    (all_param_model, pred_param), dim=0)
-
-            data_dir = save_dir + '/pred_param.xlsx'
-            df = pd.DataFrame(to_np(all_param_model))
-            write = pd.ExcelWriter(data_dir)
-            df.to_excel(write, 'sheet_1', float_format='%.3f')
-            write.save()
-            print("use model predict successfully")
-
-
-# inference
-def infer_batches(model_paths,data_filename,time_filename,param_filename,ode_func,normal):
-    if isinstance(ode_func, str):
-        ode_func = __import__(ode_func, globals(), locals(), ['get_data', 'f'])
-
-    test_dataset = read_data(data_filename, time_filename, param_filename)
-
-    test_data = SimpleDataSet(dataset=test_dataset)
-    # 归一化
-    if normal:
-        scale=test_data.preprocess_data()
-    all_param_math = None
-
-    plt.figure(1)
-    color=['r','b','g','y']
-
-
-    num_val_batches = 1024
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    dataset = prepare_data(test_data, b_train=num_val_batches)
-
-    models=[]
-
-    model_mlp = torch.load(model_paths, map_location=device)
-    # model_rnn = torch.load(model_paths[1], map_location=device)
-    # model_ode = torch.load(model_paths[2], map_location=device)
-    # model_vae = torch.load(model_paths[3], map_location=device)
-
-    all_param_mlp = None
-    all_param_rnn= None
-    all_param_ode = None
-    all_param_vae = None
-    all_param = None
-    mlp_time=0.
-    rnn_time=0.
-    ode_time=0.
-    vae_time=0.
-    math_time=0.
-    with torch.no_grad():
-
-            for step, (data,params,u_samples,time) in enumerate(dataset):
-
-                result = {}
-                data_encoder = data.to(device)
-                enc_time = time[0, :].to(device)
-
-
-                s_time=timer.time()
-                pred_param_mlp = model_mlp.compute(data_encoder, enc_time)
-                e_time = timer.time()
-                mlp_time=mlp_time+(e_time-s_time)
-                s_time = timer.time()
-                # pred_param_rnn = model_rnn.compute(data_encoder, enc_time)
-                # e_time = timer.time()
-                # rnn_time=rnn_time+(e_time-s_time)
-                # s_time = timer.time()
-                # pred_param_ode = model_ode.compute(data_encoder, enc_time)
-                # e_time = timer.time()
-                # ode_time =ode_time+(e_time - s_time)
-                # s_time = timer.time()
-                # pred_param_vae = model_vae.compute(data_encoder, enc_time)
-                # e_time = timer.time()
-                # vae_time = vae_time + (e_time - s_time)
-
-                if isinstance(pred_param_mlp, tuple):
-                    pred_param_mlp = pred_param_mlp[0]
-                # if isinstance(pred_param_rnn, tuple):
-                #     pred_param_rnn = pred_param_rnn[0]
-                # if isinstance(pred_param_ode, tuple):
-                #     pred_param_ode = pred_param_ode[0]
-                # if isinstance(pred_param_vae, tuple):
-                #     pred_param_vae = pred_param_vae[0]
-
-
-                # param_init = np.ones((params.shape[-1]))
-                # s_time=timer.time()
-                # if normal:
-                #     data = data * scale['mult'] + scale['shift']
-                # pred_param_math = ode_func.est_param(to_np(time[0, :]), to_np(data), param_init)
-                # e_time=timer.time()
-                # math_time=math_time+(e_time-s_time)
-
-                all_param_mlp = pred_param_mlp if all_param_mlp is None else torch.cat(
-                    (all_param_mlp, pred_param_mlp), dim=0)
-                # all_param_rnn = pred_param_rnn if all_param_rnn is None else torch.cat(
-                #     (all_param_rnn, pred_param_rnn), dim=0)
-                # all_param_ode = pred_param_ode if all_param_ode is None else torch.cat(
-                #     (all_param_ode, pred_param_ode), dim=0)
-                # all_param_vae = pred_param_vae if all_param_vae is None else torch.cat(
-                #     (all_param_vae, pred_param_vae), dim=0)
-                all_param=params if all_param is None else torch.cat(
-                    (all_param, params), dim=0)
-                # all_param_math = pred_param_math if all_param_math is None else torch.cat(
-                #     (all_param_math,pred_param_math), dim=0)
-
-
-    
-    print('MLP,mse loss:{:.3f},time:{:.3f}'.format( mse_loss(all_param_mlp,all_param),mlp_time))
-    # print('RNN,mse loss:{:.3f},time:{:.3f}'.format(mse_loss(all_param_rnn, all_param),rnn_time))
-    # print('ODE,mse loss:{:.3f},time:{:.3f}'.format(mse_loss(all_param_ode, all_param),ode_time))
-    # print('VAE,mse loss :{:.3f},time:{:.3f}'.format(mse_loss(all_param_vae, all_param),vae_time))
-    # print('MATH,mse loss:{:.3f},time:{:.3f}'.format(mse_loss(all_param,to_tensor(all_param_math)).to(device),math_time))
-
-    all_param = to_np(all_param)
-    # all_param_mlp = to_np(all_param_mlp)
-    # all_param_rnn = to_np(all_param_rnn)
-    # all_param_ode = to_np(all_param_ode)
-    # all_param_vae = to_np(all_param_vae)
-
-    whole_data=None
-
-    for i in range(all_param.shape[0]):
-        a=all_param[i,:]
-        b=all_param_mlp[i,:]
-        # c = all_param_rnn[i, :]
-        # d = all_param_ode[i, :]
-        # e = all_param_vae[i, :]
-        # f = all_param_math[i, :]
-        tmp=a
-        tmp=np.vstack((tmp,b))
-        # tmp = np.vstack((tmp, c))
-        # tmp = np.vstack((tmp, d))
-        # tmp = np.vstack((tmp, e))
-        # tmp = np.vstack((tmp, f))
-
-        whole_data=tmp if whole_data is None else np.vstack((whole_data,tmp))
-
-    
-    data_dir = os.path.join(os.path.dirname(data_filename),'compare_param.xlsx')
-    index = ['true', 'mlp'] * all_param.shape[0]
-
-    df = pd.DataFrame(whole_data,index=index)
-    write = pd.ExcelWriter(data_dir)
-    df.to_excel(write, 'sheet_1', float_format='%.3f')
-    write.close()
-    
 
 
 
 
-# write output and summary
-def write_excel(save_path,all_param,all_param_model):
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
+    def predict_one(self, data: torch.Tensor, time: torch.Tensor) -> torch.Tensor:
+        """
+        Predict parameters for a single data sample.
+        
+        Args:
+            data: Input data tensor of shape (batch_size, sequence_length, features)
+            time: Time points tensor of shape (sequence_length,) or (batch_size, sequence_length)
 
-    # export to excel
-    four_data = None
-    param_pic_dir = save_path + 'param_pic'
-    if not os.path.exists(param_pic_dir):
-        os.makedirs(param_pic_dir)
+        Returns:
+            Predicted parameters tensor
+        """
+        self.model.eval()
+        return self.model.compute(data.to(self.device), time.to(self.device))
+
+    def predict(self, data_file: str, time_file: str, 
+                param_file: str = None, save_dir: str = None):
+        """
+        Predict parameters for test data and optionally calculate metrics.
+        
+        Args:
+            data_file: Path to data file
+            time_file: Path to time file
+            param_file: Path to parameter file (optional, for evaluation)
+            save_dir: Directory to save results (optional)
+            
+        Returns:
+            If param_file provided: (predictions, truth, mse_losses)
+            If param_file not provided: predictions
+        """
+        # Load and prepare data
+        test_data = read_data(data_file, time_file, param_file)
+        test_dataset = SimpleDataSet(test_data)
+
+        if self.normal:
+            test_dataset.preprocess_data()
+        
+        dataset = torch.utils.data.DataLoader(test_dataset, batch_size=self.val_batch_size)
+
+        self.model.eval()
+        with torch.no_grad():
+            start_time = timer.time()
+            predictions = []
+            ground_truth = []
+            mse_losses = []
+
+            for data, params, time in dataset:
+                # Get predictions
+                predicted_param = self.predict_one(data, time[0, :])
+
+                # Why can this be a tuple...
+                if isinstance(predicted_param, tuple):
+                    import pdb; pdb.set_trace()
+                    predicted_param = predicted_param[0]
+                
+                predictions.append(predicted_param)
+
+                # Calculate metrics if ground truth is available
+                if param_file:
+                    ground_truth.append(params)
+                    mse_losses.append(mse_loss(predicted_param, params.to(self.device)))
+
+            duration = timer.time() - start_time
+
+        # Concatenate results
+        all_predictions = torch.cat(predictions, dim=0)
+        
+        results = {"predictions": all_predictions}
+        
+        if param_file:
+            all_truth = torch.cat(ground_truth, dim=0)
+            all_mse = torch.stack(mse_losses)
+            results.update({"truth": all_truth, "mse": all_mse})
+
+        # Save results if requested
+        if save_dir:
+            self.save_predictions(save_dir, results)
+        
+        print(f"Prediction completed in {duration:.2f} seconds.")
+        print(f"Average MSE is {all_mse.mean().item():.4f}" if param_file else "")
+        
+        # Return appropriate results
+        if param_file:
+            return results["predictions"], results["truth"], results["mse"]
+        return results["predictions"]
+
+    def save_predictions(self, save_dir: str, results: dict):
+        """Helper method to save prediction results to CSV."""
+
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        
+        predictions = results["predictions"].cpu().numpy()
+        
+        # Create DataFrame with predictions
+        df_data = {"prediction": predictions.tolist()}
+        
+        # Add truth and MSE if available
+        if "truth" in results:
+            truth = results["truth"].cpu().numpy()
+            mse = results["mse"].cpu().numpy()
+            df_data.update({
+                "truth": truth.tolist(),
+                "mse": mse.tolist()
+            })
+        
+        df = pd.DataFrame(df_data)
+        output_path = os.path.join(save_dir, f'{self.model_type}_predictions.csv')
+        df.to_csv(output_path, index=False)
+        print(f"Results saved to {output_path}")
 
 
-    for i in range(0, all_param.shape[0]):
-        four_data = all_param[i, :] if four_data is None else np.row_stack(
-            (four_data, all_param[i, :]))
-        four_data = np.row_stack((four_data, all_param_model[i, :]))
-
-    data_dir = param_pic_dir + '/param.xlsx'
-    index = ['true', 'ode'] * all_param.shape[0]
-    df = pd.DataFrame(four_data, index=index)
-    write = pd.ExcelWriter(data_dir)
-    df.to_excel(write, 'sheet_1', float_format='%.3f')
-    write.save()
-
-    data_dir = param_pic_dir + '/param_ode.xlsx'
-    # index = ['true', 'ode'] * all_param.shape[0]
-    df = pd.DataFrame(to_np(all_param_model))
-    write = pd.ExcelWriter(data_dir)
-    df.to_excel(write, 'sheet_1', float_format='%.3f')
-    write.save()
-
-    data_dir = param_pic_dir + '/param_ori.xlsx'
-    # index = ['true', 'ode'] * all_param.shape[0]
-    df = pd.DataFrame(to_np(all_param))
-    write = pd.ExcelWriter(data_dir)
-    df.to_excel(write, 'sheet_1', float_format='%.3f')
-    write.save()
-    write.close()
-
-    # plot true testing values vs. predictions
-    n_plot_cols = all_param_model.shape[1]
-    #  fig, ax = plt.subplots(n_plot_cols, 1)
-    for i in range(n_plot_cols):
-        ymin = torch.amin(all_param[:, i])
-        ymax = torch.amax(all_param[:, i])
-        plt.scatter(all_param[:, i], all_param_model[:, i])
-        plt.plot([ymin, ymax], [ymin, ymax], linewidth=3, linestyle='--', color='orange')
-        plt.xlabel('true')
-        plt.ylabel('predict')
-        name = 'param_{}'.format(i)
-        # plt.legend(loc='lower right')
-        plt.savefig('{}/{}'.format(param_pic_dir, name), dpi=500, bbox_inches='tight')
-        plt.clf()
+class MLP(MLModel):
+    def __init__(self, num_of_param: int, dim_of_data: int,
+                 time_points: int, config: str, model_path=None):
+        super().__init__('MLP', num_of_param, dim_of_data, 
+                         time_points, config, model_path)
 
 
+class RNN(MLModel):
+    def __init__(self, num_of_param: int, dim_of_data: int,
+                 time_points: int, config: str, model_path=None):
+        super().__init__('RNN', num_of_param, dim_of_data, 
+                         time_points, config, model_path)
 
 
+class ODE_RNN(MLModel):
+    def __init__(self, num_of_param: int, dim_of_data: int,
+                 time_points: int, config: str, model_path=None):
+        super().__init__('ODE_RNN', num_of_param, dim_of_data, 
+                         time_points, config, model_path)
 
+
+class VAE(MLModel):
+    def __init__(self, num_of_param: int, dim_of_data: int,
+                 time_points: int, config: str, model_path=None):
+        super().__init__('VAE', num_of_param, dim_of_data, 
+                         time_points, config, model_path)

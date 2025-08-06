@@ -14,7 +14,8 @@ from models.DERLPSO import DERLPSO
 
 class ODE_Models:
     def __init__(self, equation: ODE_Equation, init_data: List[float], 
-                 param_mu: List[float], param_sigma: List[float]):
+                 param_mu: List[float], param_sigma: List[float],
+                 config = "models/configs/fn.yaml"):
         assert len(param_mu) == len(param_sigma), "param_mu and param_sigma must have the same length"
         self.equation = equation
         self.init_data = init_data

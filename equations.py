@@ -12,9 +12,8 @@ class Equation:
 
 
 class ODE_Equation(Equation):
-    def __init__(self, name: str, func: Callable[..., List[float]], configs="models/configs/fn.yaml"):
+    def __init__(self, name: str, func: Callable[..., List[float]]):
         super().__init__(name, 'ODE', func)
-        self.configs = configs
     
 class PDE_Equation(Equation):
     def __init__(self, name: str, func: Callable[..., List[float]]):
@@ -28,7 +27,7 @@ def FitzHugh_Nagumo_func(t, y, param, RI=0.4, tau=3.0):
     dwdt = (1 / tau) * (v + a - b * w)
     return [dvdt, dwdt]
 
-FitzHugh_Nagumo = ODE_Equation("FitzHugh-Nagumo", FitzHugh_Nagumo_func, configs="models/configs/fn.yaml")
+FitzHugh_Nagumo = ODE_Equation("FitzHugh-Nagumo", FitzHugh_Nagumo_func)
 
 
 def Lotka_Volterra_func(t, y, param):
@@ -38,7 +37,7 @@ def Lotka_Volterra_func(t, y, param):
     dvdt = d * l * v - y * v
     return [dldt, dvdt]
 
-Lotka_Volterra = ODE_Equation("Lotka-Volterra", Lotka_Volterra_func, configs="models/configs/.yaml")
+Lotka_Volterra = ODE_Equation("Lotka-Volterra", Lotka_Volterra_func)
 
 
 def Lorenz_func(t, y, param):
@@ -49,4 +48,4 @@ def Lorenz_func(t, y, param):
         dzdt = x * y - b * z
         return [dxdt, dydt, dzdt]
 
-Lorenz = ODE_Equation("Lorenz", Lorenz_func, configs="models/configs/lv.yaml")
+Lorenz = ODE_Equation("Lorenz", Lorenz_func)

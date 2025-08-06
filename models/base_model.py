@@ -1,10 +1,13 @@
 
-from typing import List, Callable
-from equations import Equation
-
 class BaseModel:
     def __init__(self):
-        pass
+        raise NotImplementedError()
 
-    def test(self):
-        pass
+    def train(self):
+        raise NotImplementedError()
+
+    def predict_one(self):
+        raise NotImplementedError()
+    
+    def predict(self):
+        raise NotImplementedError()
