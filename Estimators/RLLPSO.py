@@ -11,9 +11,9 @@ import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 from scipy.stats import truncnorm
 
-from .base_model import BaseModel
+from .estimator import Estimator
 
-class RLLPSO(BaseModel):
+class RLLPSO(Estimator):
     def __init__(self, pN, dim, max_iter, α, β, δ, γ, numberOfLayers_list, actual_data, time, initial_conditions):
         self.r1 = 0
         self.r2 = 0

@@ -1,13 +1,12 @@
 from scipy.integrate import odeint
 import numpy as np
 
-from .base_model import BaseModel
-from data import read_data
+from Estimators.estimator import Estimator
 from equations import Equation, ODE_Equation, PDE_Equation
 from sklearn.metrics import mean_squared_error
 
-class DERLPSO(BaseModel):
-    def __init__(self, func:Equation, param, data, times, particle_num=100,
+class DERLPSO(Estimator):
+    def __init__(self, func: Equation, param_num, data, times, particle_num=100,
                  max_iter=200, layers_list=[4, 6, 8, 10], upper=10,
                  lower=1e-10, threshold=1e-04):
 
@@ -15,10 +14,9 @@ class DERLPSO(BaseModel):
         self.upper = upper
         self.lower = lower
         self.particle_num = particle_num
-        self.param_num = len(param)
+        self.param_num = param_num
         self.max_iter = max_iter
         self.layers_list = layers_list
-        self.params = param
 
         # Initialize particle arrays
         self.X = np.zeros((self.particle_num, self.param_num))
@@ -263,20 +261,22 @@ class DERLPSO(BaseModel):
                                  self.q_table[self.pre_state][self.current_state]))
             self.q_table[self.pre_state][self.current_state] = new_q
 
+    def train(self):
+        Exception("DERLPSO does not need to train.")
 
-    def test(self):
+    def predict(self, param):
 
         self.init_particles()
         self.iterator()
-        
+
         est_params = np.asarray(self.get_global_best())
-        err = est_params - self.params
+        err = est_params - param
         temp_est_params = tuple(est_params),
         fit  = odeint(self.func.f(), self.initial, self.times, args=temp_est_params, tfirst=True)
         mse = mean_squared_error(self.data, fit)
 
         return {
-                "true_params": self.params,
+                "true_params": param,
                 "est_params": est_params.tolist(),
                 "err": err.tolist(),
                 "mse0": mse

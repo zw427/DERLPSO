@@ -1,6 +1,5 @@
 from typing import Callable, List
 
-
 class Equation:
     def __init__(self, name: str, de_type: str, func: Callable[..., List[float]]):
         self.name = name
@@ -14,6 +13,7 @@ class Equation:
 class ODE_Equation(Equation):
     def __init__(self, name: str, func: Callable[..., List[float]]):
         super().__init__(name, 'ODE', func)
+    
     
 class PDE_Equation(Equation):
     def __init__(self, name: str, func: Callable[..., List[float]]):

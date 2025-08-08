@@ -8,8 +8,8 @@ from typing import List
 import torch 
 import torch.nn as nn
 
-from models.ml_model_components.gated_recurrent_unit import GRUUnitOriginal, GRUUnit
-from models.ml_model_components.model_utils import linspace_vector, build_modules
+from Estimators.ml_model_components.gated_recurrent_unit import GRUUnitOriginal, GRUUnit
+from Estimators.ml_model_components.model_utils import linspace_vector, build_modules
 
 
 class RNN(nn.Module):

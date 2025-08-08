@@ -7,7 +7,7 @@ encoder-decoder architectures and variational autoencoders.
 
 from typing import Dict, Tuple, Any
 
-from models.ml_model_components.model_utils import sample_standard_gaussian
+from Estimators.ml_model_components.model_utils import sample_standard_gaussian
 
 import torch
 import torch.nn as nn

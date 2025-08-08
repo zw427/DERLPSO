@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 from typing import Tuple
 
-from models.ml_model_components.model_utils import init_network_weights, split_last_dim
+from Estimators.ml_model_components.model_utils import init_network_weights, split_last_dim
 
 
 class GRUUnitOriginal(nn.Module):

@@ -1,7 +1,5 @@
 # ignore generated outputs
-saved_models/
-data/
-results/
+models/
 
 .DS_Store
 .vscode

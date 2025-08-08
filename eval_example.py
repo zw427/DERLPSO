@@ -5,9 +5,9 @@ warnings.filterwarnings("ignore")
 from equations import FitzHugh_Nagumo, Lotka_Volterra, Lorenz
 from interface import ODE_Models
 
-from models.DERLPSO import DERLPSO
-from models.RLLPSO import RLLPSO
-from models.ml_models import MLP, RNN, ODE_RNN, VAE
+from Estimators.DERLPSO import DERLPSO
+from Estimators.RLLPSO import RLLPSO
+from Estimators.ml_models import MLP, RNN, ODE_RNN, VAE
 
 eval_models = [DERLPSO, MLP, RNN, ODE_RNN, VAE]
 

@@ -4,11 +4,11 @@ Model factory for creating various neural network architectures.
 import torch 
 import torch.nn as nn
 
-from models.ml_model_components.diffeq_solver import DiffeqSolver
-from models.ml_model_components.encoder_decoder import VAE_ODE_RNN, VAE_RNN, RNN, ODE_RNN, MLP, DecoderMLP, DecoderODE_RNN
-from models.ml_model_components.model_utils import create_net, build_modules
-from models.ml_model_components.ode_func import ODEFunc
-from models.ml_model_components.parameter_estimators import VAE, EncoderDecoder, Base
+from Estimators.ml_model_components.diffeq_solver import DiffeqSolver
+from Estimators.ml_model_components.encoder_decoder import VAE_ODE_RNN, VAE_RNN, RNN, ODE_RNN, MLP, DecoderMLP, DecoderODE_RNN
+from Estimators.ml_model_components.model_utils import create_net, build_modules
+from Estimators.ml_model_components.ode_func import ODEFunc
+from Estimators.ml_model_components.parameter_estimators import VAE, EncoderDecoder, Base
 
 
 def create_model(net_configs: dict, num_of_param: int, dim_of_data: int, 

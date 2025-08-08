@@ -1,10 +1,9 @@
-from .base_model import BaseModel
+from .estimator import Estimator
 from typing import List, Optional
 from equations import Equation
 from torch.distributions import Normal, Independent
 from .ml_model_components.create_model import create_model
 import pandas as pd
-from data import read_data
 
 import os
 import time as timer
@@ -17,7 +16,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 
-class MLModel(BaseModel):
+class MLModel(Estimator):
     def __init__(self, model_type: str, num_of_param: int, dim_of_data: int,
                  time_points: int, config: str, model_path: Optional[str] = None):
         """

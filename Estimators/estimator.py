@@ -1,5 +1,5 @@
 
-class BaseModel:
+class Estimator:
     def __init__(self):
         raise NotImplementedError()
 
