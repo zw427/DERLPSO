@@ -280,7 +280,7 @@ class DERLPSO(Estimator):
 
     def predict(self, data, time):
         estimator = DERLPSO_ALGORITHM(
-            self.func, data, list(time),
+            self.func, data, time,  # Fixed: was passing list(time) but constructor expects times
             self.particle_num, self.max_iter, self.layers_list,
             self.upper, self.lower, self.threshold
         )
