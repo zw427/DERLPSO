@@ -1,6 +1,6 @@
 from .estimator import Estimator
 from typing import List, Optional
-from equations import Equation
+from equation import Equation
 from torch.distributions import Normal, Independent
 from .ml_model_components.create_model import create_model
 import pandas as pd

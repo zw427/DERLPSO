@@ -34,5 +34,4 @@ class Parameter:
         samples = [dist.sample((n, 1)).squeeze(1) for dist in self.distributions]
         # Ensure each sample is 2D for concatenation
         samples = [s.unsqueeze(1) if s.ndim == 1 else s for s in samples]
-        import pdb; pdb.set_trace()
         return torch.cat(samples, dim=1)

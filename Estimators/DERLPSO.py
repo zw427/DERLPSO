@@ -2,11 +2,11 @@ from scipy.integrate import odeint
 import numpy as np
 
 from Estimators.estimator import Estimator
-from equations import Equation, ODE_Equation, PDE_Equation
-from sklearn.metrics import mean_squared_error
+from equation import Equation, ODE_Equation, PDE_Equation
 
-class DERLPSO(Estimator):
-    def __init__(self, func: Equation, param_num, data, times, particle_num=100,
+
+class DERLPSO_ALGORITHM:
+    def __init__(self, func: Equation, data, times, particle_num=100,
                  max_iter=200, layers_list=[4, 6, 8, 10], upper=10,
                  lower=1e-10, threshold=1e-04):
 
@@ -14,7 +14,7 @@ class DERLPSO(Estimator):
         self.upper = upper
         self.lower = lower
         self.particle_num = particle_num
-        self.param_num = param_num
+        self.param_num = func.num_param
         self.max_iter = max_iter
         self.layers_list = layers_list
 
@@ -62,7 +62,8 @@ class DERLPSO(Estimator):
     def get_fit(self):
         return self.fit
 
-    def mse_loss(self, X):# Debugging line to inspect X
+    def mse_loss(self, X):
+        """Calculate MSE loss between predicted and actual data."""
         temp_x = tuple(X),
         if isinstance(self.func, ODE_Equation):
             predicted_data = odeint(self.func.f(), self.initial, self.times,
@@ -261,23 +262,28 @@ class DERLPSO(Estimator):
                                  self.q_table[self.pre_state][self.current_state]))
             self.q_table[self.pre_state][self.current_state] = new_q
 
+
+class DERLPSO(Estimator):
+    def __init__(self, func: Equation, particle_num=100,
+                 max_iter=200, layers_list=[4, 6, 8, 10], upper=10,
+                 lower=1e-10, threshold=1e-04):
+        self.func = func
+        self.particle_num = particle_num
+        self.max_iter = max_iter
+        self.layers_list = layers_list
+        self.upper = upper
+        self.lower = lower
+        self.threshold = threshold
+        
     def train(self):
-        Exception("DERLPSO does not need to train.")
+        raise Exception("DERLPSO does not need to train.")
 
-    def predict(self, param):
-
-        self.init_particles()
-        self.iterator()
-
-        est_params = np.asarray(self.get_global_best())
-        err = est_params - param
-        temp_est_params = tuple(est_params),
-        fit  = odeint(self.func.f(), self.initial, self.times, args=temp_est_params, tfirst=True)
-        mse = mean_squared_error(self.data, fit)
-
-        return {
-                "true_params": param,
-                "est_params": est_params.tolist(),
-                "err": err.tolist(),
-                "mse0": mse
-            }
+    def predict(self, data, time):
+        estimator = DERLPSO_ALGORITHM(
+            self.func, data, list(time),
+            self.particle_num, self.max_iter, self.layers_list,
+            self.upper, self.lower, self.threshold
+        )
+        estimator.init_particles()
+        estimator.iterator()
+        return estimator.get_global_best()
