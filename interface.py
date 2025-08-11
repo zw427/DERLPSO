@@ -8,7 +8,7 @@ from scipy.integrate import solve_ivp
 from equation import Equation, ODE_Equation, PDE_Equation
 from parameter import Parameter
 from Estimators.estimator import Estimator
-
+from Estimators.ml_estimator import MLEstimator
 
 class DE_Models: 
     def __init__():
@@ -88,11 +88,13 @@ class ODE_Models(DE_Models):
             torch.manual_seed(seed)
             print("Seed set to:", seed)
 
-        predicted = np.zeros((data.shape[0], self.equation.num_param))
-
-        for i in range(data.shape[0]):
-            predicted[i] = self.parameter_est(estimator, data[i], time[i])
-
+        if isinstance(estimator, MLEstimator):
+            predicted = self.parameter_est(estimator, data, time)
+        else:
+            predicted = np.zeros((data.shape[0], self.equation.num_param))
+            for i in range(data.shape[0]):
+                predicted[i] = estimator.predict(data[i], time[i])
+            
         if param is None:
             return {'data': data, 'time': time, 'predicted': predicted}
 

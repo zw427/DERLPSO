@@ -16,7 +16,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 
-class MLModel(Estimator):
+class MLEstimator(Estimator):
     def __init__(self, model_type: str, num_of_param: int, dim_of_data: int,
                  time_points: int, config: str, model_path: Optional[str] = None):
         """
