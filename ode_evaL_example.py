@@ -5,7 +5,7 @@ from ode_model import ODE_Models
 from parameter import Parameter
 
 from Estimators.DERLPSO import DERLPSO
-# from Estimators.RLLPSO import RLLPSO
+from Estimators.RLLPSO import RLLPSO
 from Estimators.ml_estimator import MLP, RNN, ODE_RNN, VAE
 
 def evaluate_FitzHugh_Nagumo(num_data, points, seed):
@@ -28,29 +28,35 @@ def evaluate_FitzHugh_Nagumo(num_data, points, seed):
             fhn_model.pprint(r0)
 
         # MLP
-        if True:
+        if False:
             est1 = MLP(FitzHugh_Nagumo.num_param, 2, point, "Estimators/configs/fn.yaml")
             r1 = fhn_model.evaluate(est1, test, train, seed)
             fhn_model.pprint(r1)
 
         # RNN
-        if True:
+        if False:
             est2 = RNN(FitzHugh_Nagumo.num_param, 2, point, "Estimators/configs/fn.yaml")
             r2 = fhn_model.evaluate(est2, test, train, seed)
             fhn_model.pprint(r2)
 
 
         # ODE_RNN 
-        if True:
+        if False:
             est3 = ODE_RNN(FitzHugh_Nagumo.num_param, 2, point, "Estimators/configs/fn.yaml")
             r3 = fhn_model.evaluate(est3, test, train, seed)
             fhn_model.pprint(r3)
 
         # VAE
-        if True:
+        if False:
             est4 = VAE(FitzHugh_Nagumo.num_param, 2, point, "Estimators/configs/fn.yaml")
             r4 = fhn_model.evaluate(est4, test, train, seed)
             fhn_model.pprint(r4)
+
+        if True:
+            est5 = RLLPSO(FitzHugh_Nagumo)
+            r5 = fhn_model.evaluate(est5, test, train, seed)
+            fhn_model.pprint(r5)
+            
 
 
 # p1 = Parameter([Normal(mu=[0.4, 1.3, 1, 1], sigma=[0.5, 0.5, 0.5, 0.5])])

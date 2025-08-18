@@ -70,7 +70,7 @@ class DERLPSO_ALGORITHM:
         temp_x = tuple(X),
         if isinstance(self.func, ODE_Equation):
             predicted_data = odeint(self.func.f(), self.initial, self.times,
-                                    args=temp_x, tfirst=True)
+                                        args=X, tfirst=self.func.t_first)
         elif isinstance(self.func, PDE_Equation):
             predicted_data = self.func.f()(X)
 
