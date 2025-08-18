@@ -7,7 +7,6 @@ import math
 
 import numpy as np
 import random
-import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 from scipy.stats import truncnorm
 

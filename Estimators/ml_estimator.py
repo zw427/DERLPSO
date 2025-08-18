@@ -8,7 +8,6 @@ from typing import Optional
 import torch
 import torch.optim as optim
 import pandas as pd
-from torch.utils.tensorboard import SummaryWriter
 from torch.distributions import Normal, Independent, kl_divergence
 
 # Local imports
