@@ -18,7 +18,7 @@ def evaluate_FitzHugh_Nagumo(num_data, points, seed):
         fhn_model = ODE_Models(FitzHugh_Nagumo)
         train = fhn_model.simulate(num_data, parameter=p0, init_data=[0, 0], 
                                    interval=[0, 20], point=point, seed=seed + 1)
-        test = fhn_model.simulate(num_data, parameter=p0, init_data=[0, 0], 
+        test = fhn_model.simulate(num_data * 100, parameter=p0, init_data=[0, 0], 
                                    interval=[0, 20], point=point, seed=seed)
 
         # DERLPSO

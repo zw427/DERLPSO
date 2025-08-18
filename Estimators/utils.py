@@ -69,7 +69,7 @@ class EarlyStopping:
         self.counter = 0
         self.best_score = None
         self.early_stop = False
-        self.val_loss_min = np.Inf
+        self.val_loss_min = np.inf
         self.delta = delta
 
     def __call__(self, val_loss, model):
@@ -151,7 +151,7 @@ def split_data(data,time,param,train_fraq=0.6):
         'params': test_param,
         'time': test_time_steps}
 
-    return train_data_dict,test_data_dict
+    return train_data_dict, test_data_dict
 
 
 

@@ -90,7 +90,7 @@ class ODE_Models(DE_Models):
         # if ML Estimator, then train on train_set (can batch predict)
         if isinstance(estimator, MLEstimator):
             assert train_set is not None
-            # estimator.train(train_set, seed) # TODO
+            estimator.train(train_set, seed)
             prediction = self.parameter_est(estimator, data, time)
         else:
             # get predictions from estimator

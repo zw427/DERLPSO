@@ -67,305 +67,247 @@ class MLEstimator(Estimator):
                 time_points, model_type, self.device
             ).float().to(self.device)
     
-    def train(self):
-        pass
+    def train(self, train: dict, seed: int = None):
 
-    # log_path = "."
-    # if not os.path.exists(os.path.dirname(log_path)):
-    #     os.makedirs(os.path.dirname(log_path))
-    # logger = get_logger(logpath=log_path)
+        if seed:
+            # Set random seed for reproducibility
+            torch.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed)
 
-#     data = read_data(data_filename, time_filename, param_filename)
-#     train_with_data(configs_param, base_dir,num_of_param, dim_of_data, data)
+        num_train_batches = self.train_batch_size
+        num_test_batches = self.train_batch_size 
 
-# def train_with_data(configs,base_dir,num_of_param,dim_of_data,data):
+        time_points = train["time"].shape[-1]
+        data = train['data']
+        time = train['time']
+        param = train['param']
 
-#     num_train_batches = configs['Net']["train_batch_size"]
-#     num_test_batches = configs['Net']["eval_batch_size"]
+        train_dict, test_dict = split_data(data, time, param, train_fraq = 0.6)
 
-#     time_points=data["time"].shape[-1]
-#     all_data=data['data']
-#     all_time = data['time']
-#     all_param= data['params']
+        train_dataset = SimpleDataSet(train_dict)
+        test_dataset = SimpleDataSet(test_dict)
 
-#     train_dict,test_dict=split_data(all_data,all_time,all_param,train_fraq=0.6)
+        if self.normal:
+            train_dataset.preprocess_data()
+            test_dataset.preprocess_data()
 
+        train_dataset = torch.utils.data.DataLoader(train_dataset, batch_size=num_train_batches, shuffle=False,pin_memory=False)
+        test_dataset = torch.utils.data.DataLoader(test_dataset, batch_size=num_test_batches, shuffle=False,pin_memory=False)
+
+        optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=1e-5)
+        
+        CosineLR = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5, eta_min=1e-6)
     
-#     train_data_comm = SimpleDataSet(train_dict)
-#     test_data_comm = SimpleDataSet(test_dict)
 
-#     # 归一化
-#     if configs['normal']:
-#         train_data_comm.preprocess_data()
-#         test_data_comm.preprocess_data()
-#     # 装载数据
+        current_epoch = 0
+        best_loss = float("inf")
 
-#     train_dataset = prepare_data(train_data_comm, b_train=num_train_batches)
-#     test_dataset = prepare_data(test_data_comm, b_train=num_test_batches)
-#     train(configs, base_dir,train_dataset, test_dataset,num_of_param,dim_of_data,time_points)
+        self.model.to(self.device)
 
+        save_path = f'models/{self.model_type}/checkpoints/'
+        if not os.path.exists(os.path.dirname(save_path)):
+            os.makedirs(os.path.dirname(save_path))
+        early_stopping = EarlyStopping(save_path, 500, True, delta=1e-3)
 
-# def train(configs,base_dir,train_dataset,val_dataset,num_of_param,dim_of_data,time_points):
-#     model== create_model(configs['Net'],num_of_param,dim_of_data,time_points,configs['type'], configs['device'])
-#     device = torch.device(configs['device'] if torch.cuda.is_available() else 'cpu')
-#     writer = SummaryWriter(log_dir='{}/{}'.format(base_dir,configs['type']))
+        if self.model_type == 'VAE':
+            latent_dims = self.config['Net']['latent_dim']
 
-#     log_path = '{}/{}/{}'.format(base_dir, configs['type'], 'train.log')
-#     logger = get_logger(logpath=log_path, filepath=os.path.abspath(__file__))
-#     optimizer = optim.Adam(model.parameters(), lr=float(configs['Net']['learning_rate']), weight_decay=1e-5)
-#     CosineLR = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5, eta_min=1e-6)
-#     if configs["Net"]["load"]:
-#         current_epoch, best_loss = get_ckpt_model(
-#             '{}/{}/checkpoints/best_loss.ckpt'.format(base_dir, configs['type']), model, optimizer, device)
-#         logger.info(
-#             'continue training in {} epoch,current loss  is {}'.format(current_epoch, best_loss))
+            prior_mu = torch.zeros((latent_dims), dtype=torch.float64).to(self.device)
+            prior_sigma = torch.ones((latent_dims), dtype=torch.float64).to(self.device)
 
-#     current_epoch = 0
-#     best_loss = float("inf")
+            prior = Normal(prior_mu, prior_sigma)
 
-#     model.double()
-#     model = model.to(device)
+            for epoch in range(current_epoch, self.max_epoch):
+                    
+                optimizer.zero_grad()
 
-#     save_path = '{}/{}/checkpoints/'.format(base_dir, configs['type'])
-#     if not os.path.exists(os.path.dirname(save_path)):
-#         os.makedirs(os.path.dirname(save_path))
-#     early_stopping = EarlyStopping(save_path,500,True,delta=1e-3)
+                train_res = {}
+                train_res["train_param_loss"] = 0.
+                train_res["train_kl_loss"] = 0.
 
-#     ##### 训练vae模型
-#     if configs['type']=='VAE':
-#                     latent_dims=configs['Net']['latent_dim']
+                total_loss=0.
 
-#                     prior_mu = torch.zeros((latent_dims), dtype=torch.float64).to(device)
-#                     prior_sigma = torch.ones((latent_dims), dtype=torch.float64).to(device)
+                for step, (data, param, u_samples, time) in enumerate(train_dataset):
 
-#                     prior = Normal(prior_mu, prior_sigma)
+                    data = data.type(torch.float)
+                    param = param.type(torch.float)
+                    time = time.type(torch.float)
 
-#                     for epoch in range(current_epoch, configs['Net']['max_epochs']):
+                    true_param=param.to(self.device)
+                    data_encoder = data.detach().to(self.device)
+                    enc_time = torch.tensor(time[0,:]).to(self.device)
 
-#                         logger.info('\nEpoch: {}'.format(str(epoch)))
-#                         logger.info('\nLearning rate:{}'.format(str(optimizer.param_groups[0]["lr"])))
-#                         optimizer.zero_grad()
+                    pred_param,pred_mu,pred_std= self.model.compute(data_encoder,enc_time)
 
-#                         train_res = {}
-#                         train_res["train_param_loss"] = 0.
-#                         train_res["train_kl_loss"] = 0.
+                    #loss--klv
+                    fp_distr = Normal(pred_mu,pred_std)
+                    kldiv_z0_gau = kl_divergence(fp_distr, prior)
+                    train_kld = torch.mean(kldiv_z0_gau)
 
-#                         total_loss=0.
+                    #loss--mse,likelihood
+                    train_param_loss = mse_loss(true_param, pred_param)
 
-#                         for step, (data, param,u_samples, time) in enumerate(train_dataset):
+                    total_loss = train_param_loss+total_loss+train_kld
 
-#                             true_param=param.to(device)
-#                             data_encoder = data.detach().to(device)
-#                             enc_time = torch.tensor(time[0,:]).to(device)
+                    result = {}
+                    result["train_param_loss"] = train_param_loss.item()
+                    result["train_kl_loss"] = train_kld.item()
 
 
-#                             pred_param,pred_mu,pred_std= model.compute(data_encoder,enc_time)
+                    #cal loss
+                    for key in train_res.keys():
+                        if key in result.keys():
+                            var = result[key]
+                            if isinstance(var, torch.Tensor):
+                                var = var.detach()
+                            train_res[key] += var
 
-#                             #loss--klv
-#                             fp_distr = Normal(pred_mu,pred_std)
-#                             kldiv_z0_gau = kl_divergence(fp_distr, prior)
-#                             train_kld = torch.mean(kldiv_z0_gau)
+                message = 'Epoch {:04d},[Train |  KLD_loss {:.4f}param_loss {:.4f} '.format(
+                            epoch, train_res["train_kl_loss"], train_res["train_param_loss"])
+                
+                #backwards
+                total_loss.backward()
+                optimizer.step()
+                
+                test_total_loss = 0.
+                if epoch % self.eval_epoch == 0:
+                    test_epoch = int(epoch/self.eval_epoch)
+                    with torch.no_grad():
+                        test_res = {}
+                        test_res["test_kl_loss"] = 0.
+                        test_res["test_param_loss"] = 0.
 
+                        for step, (data, param,u_samples, time) in enumerate(test_dataset):
+                            #true_param = torch.cat((rho, sigma, param), dim=-1)
 
-#                             #loss--mse,likelihood
-#                             train_param_loss = mse_loss(true_param, pred_param)
+                            data = data.type(torch.float)
+                            param = param.type(torch.float)
+                            time = time.type(torch.float)
 
-#                             total_loss=train_param_loss+total_loss+train_kld
+                    
+                            true_param=param.to(self.device)
 
-#                             result = {}
-#                             result["train_param_loss"] = train_param_loss.item()
-#                             result["train_kl_loss"] = train_kld.item()
+                            data_encoder = data.to(self.device)
+                            enc_time = torch.tensor(time[0,:]).to(self.device)
+                            pred_param,pred_mu,pred_std = self.model.compute(data_encoder,enc_time)
 
+                            fp_distr = Normal(pred_mu, pred_std)
 
-#                             #cal loss
-#                             for key in train_res.keys():
-#                                 if key in result.keys():
-#                                     var = result[key]
-#                                     if isinstance(var, torch.Tensor):
-#                                         var = var.detach()
-#                                     train_res[key] += var
+                            kldiv_z0_gau = kl_divergence(fp_distr, prior)
 
-#                         message = 'Epoch {:04d},[Train |  KLD_loss {:.4f}param_loss {:.4f} '.format(
-#                             epoch, train_res["train_kl_loss"], train_res["train_param_loss"])
+                            test_kld = torch.mean(kldiv_z0_gau)
 
-#                         logger.info(message)
-#                         writer.add_scalar('train/kld', train_res["train_kl_loss"], epoch)
-#                         writer.add_scalar('train/param_loss', train_res["train_param_loss"], epoch)
+                            test_param_loss = mse_loss(true_param, pred_param)
 
-#                         #backwards
-#                         total_loss.backward()
-#                         optimizer.step()
 
-#                         print('=====================train epoch {0} over=============================='.format(epoch))
-#                         test_total_loss=0.
-#                         if epoch % configs['Net']['eval_epoch'] == 0:
-#                             test_epoch=int(epoch/configs['Net']['eval_epoch'])
-#                             with torch.no_grad():
-#                                 test_res = {}
-#                                 test_res["test_kl_loss"] = 0.
-#                                 test_res["test_param_loss"] = 0.
+                            test_total_loss = test_total_loss + test_param_loss+test_kld
 
-#                                 for step, (data, param,u_samples, time) in enumerate(val_dataset):
-#                                     #true_param = torch.cat((rho, sigma, param), dim=-1)
-#                                     true_param=param.to(device)
+                            result = {}
+                            result["test_kl_loss"] = test_kld.item()
+                            result["test_param_loss"] = test_param_loss.item()
 
-#                                     data_encoder = data.to(device)
-#                                     enc_time = torch.tensor(time[0,:]).to(device)
-#                                     pred_param,pred_mu,pred_std = model.compute(data_encoder,enc_time)
+                            for key in test_res.keys():
+                                if key in result.keys():
+                                    var = result[key]
+                                    if isinstance(var, torch.Tensor):
+                                        var = var.detach()
+                                    test_res[key] += var
 
-#                                     fp_distr = Normal(pred_mu, pred_std)
+                        message = 'Epoch {:04d},[Test | KLD_loss {:.4f} |  param_loss {:.4f} '.format(
+                            test_epoch,  test_res["test_kl_loss"],test_res["test_param_loss"])
 
-#                                     kldiv_z0_gau = kl_divergence(fp_distr, prior)
 
-#                                     test_kld = torch.mean(kldiv_z0_gau)
+                        early_stopping((test_res["test_param_loss"]+test_res["test_kl_loss"]), self.model)
+                        if early_stopping.early_stop:
+                            print("Early stopping")
+                            return
 
-#                                     test_param_loss = mse_loss(true_param, pred_param)
+                CosineLR.step()
 
+        else:
+            for epoch in range(current_epoch, self.max_epoch):
+                optimizer.zero_grad()
 
-#                                     test_total_loss = test_total_loss + test_param_loss+test_kld
+                train_res = {}
+                # train_res["loss"] = 0.
+                # train_res["train_param_likelihood"] = 0.
+                train_res["train_param_loss"] = 0.
 
-#                                     result = {}
-#                                     result["test_kl_loss"] = test_kld.item()
-#                                     result["test_param_loss"] = test_param_loss.item()
+                total_loss = 0.
 
-#                                     for key in test_res.keys():
-#                                         if key in result.keys():
-#                                             var = result[key]
-#                                             if isinstance(var, torch.Tensor):
-#                                                 var = var.detach()
-#                                             test_res[key] += var
+                for step, (data, param, u_samples, time) in enumerate(train_dataset):
 
-#                                 message = 'Epoch {:04d},[Test | KLD_loss {:.4f} |  param_loss {:.4f} '.format(
-#                                     test_epoch,  test_res["test_kl_loss"],test_res["test_param_loss"])
+                        data = data.type(torch.float)
+                        param = param.type(torch.float)
+                        time = time.type(torch.float)
 
-#                                 logger.info(message)
-#                                 writer.add_scalar('test/kld', test_res["test_kl_loss"], test_epoch)
-#                                 writer.add_scalar('test/param_loss', test_res["test_param_loss"], test_epoch)
+                        true_param = param.to(self.device)
 
-#                                 early_stopping((test_res["test_param_loss"]+test_res["test_kl_loss"]), model)
-#                                 # 达到早停止条件时，early_stop会被置为True
-#                                 if early_stopping.early_stop:
-#                                     print("Early stopping")
-#                                     writer.close()
-#                                     return  # 跳出迭代，结束训练
+                        data_encoder = data.detach().to(self.device)
+                        enc_time = torch.tensor(time[0,:]).to(self.device)
 
-#                         CosineLR.step()
-#                     writer.close()
-#     else:
-#         for epoch in range(current_epoch, configs['Net']['max_epochs']):
-#             logger.info('\nEpoch: {}'.format(str(epoch)))
-#             logger.info('\nLearning rate:{}'.format(str(optimizer.param_groups[0]["lr"])))
-#             optimizer.zero_grad()
+                        pred_param = self.model.compute(data_encoder,enc_time)
 
-#             train_res = {}
-#             # train_res["loss"] = 0.
-#             # train_res["train_param_likelihood"] = 0.
-#             train_res["train_param_loss"] = 0.
+                        train_param_loss = mse_loss(true_param, pred_param)
+                    
+                        total_loss = train_param_loss + total_loss
 
-#             total_loss = 0.
+                        result = {}
 
+                        result["train_param_loss"] = train_param_loss.item()
 
-#             for step, (data, param,u_samples, time) in enumerate(train_dataset):
+                        # cal loss
+                        for key in train_res.keys():
+                            if key in result.keys():
+                                var = result[key]
+                                if isinstance(var, torch.Tensor):
+                                    var = var.detach()
+                                train_res[key] += var
 
-#                     true_param=param.to(device)
+                # backwards
+                total_loss.backward()
+                optimizer.step()
 
-#                     data_encoder = data.detach().to(device)
-#                     enc_time = torch.tensor(time[0,:]).to(device)
+                test_total_loss = 0.
+                if epoch % self.eval_epoch == 0:
+                    self.model.eval()
+                    test_epoch = int(epoch / self.eval_epoch)
+                    with torch.no_grad():
+                        test_res = {}
+                        test_res["test_param_loss"] = 0.
+                        for step, (data,  param, u_samples,time) in enumerate(train_dataset):
 
+                            data = data.type(torch.float)
+                            param = param.type(torch.float)
+                            time = time.type(torch.float)
 
-#                     pred_param = model.compute(data_encoder,enc_time)
+                            true_param=param.to(self.device)
 
-#                     train_param_loss = mse_loss(true_param, pred_param)
-                  
-#                     total_loss = train_param_loss + total_loss
+                            data_encoder =data.detach().to(self.device)
+                            enc_time = torch.tensor(time[0,:]).to(self.device)
 
-#                     result = {}
 
-#                     result["train_param_loss"] = train_param_loss.item()
+                            pred_param= self.model.compute(data_encoder,enc_time)
 
-#                     # cal loss
-#                     for key in train_res.keys():
-#                         if key in result.keys():
-#                             var = result[key]
-#                             if isinstance(var, torch.Tensor):
-#                                 var = var.detach()
-#                             train_res[key] += var
+                            test_param_loss = mse_loss(true_param, pred_param)
+                            test_total_loss = test_total_loss + test_param_loss
 
-#             message = 'Epoch {:04d},[Train | mse_loss {:.6f} '.format(epoch,train_res["train_param_loss"])
+                            result = {}
+                            result["test_param_loss"] = test_param_loss.item()
 
-#             logger.info(message)
-#             writer.add_scalar('train/param_loss', train_res["train_param_loss"], epoch)
+                            for key in test_res.keys():
+                                if key in result.keys():
+                                    var = result[key]
+                                    if isinstance(var, torch.Tensor):
+                                        var = var.detach()
+                                    test_res[key] += var
 
-#             # backwards
-#             total_loss.backward()
-#             optimizer.step()
 
-#             print('=====================train epoch {0} over=============================='.format(epoch))
-#             test_total_loss = 0.
-#             if epoch % configs['Net']['eval_epoch'] == 0:
-#                 model.eval()
-#                 test_epoch = int(epoch / configs['Net']['eval_epoch'])
-#                 with torch.no_grad():
-#                     test_res = {}
-#                     test_res["test_param_loss"] = 0.
-#                     for step, (data,  param, u_samples,time) in enumerate(val_dataset):
+                        early_stopping((test_res["test_param_loss"]), self.model)
 
-
-                     
-#                         true_param=param.to(device)
-
-#                         data_encoder =data.detach().to(device)
-#                         enc_time = torch.tensor(time[0,:]).to(device)
-
-
-#                         pred_param= model.compute(data_encoder,enc_time)
-
-#                         test_param_loss = mse_loss(true_param, pred_param)
-#                         test_total_loss = test_total_loss + test_param_loss
-
-#                         result = {}
-#                         result["test_param_loss"] = test_param_loss.item()
-
-#                         for key in test_res.keys():
-#                             if key in result.keys():
-#                                 var = result[key]
-#                                 if isinstance(var, torch.Tensor):
-#                                     var = var.detach()
-#                                 test_res[key] += var
-
-#                     message = 'Epoch {:04d},[Test | param_loss {:.6f}'.format(test_epoch, test_res["test_param_loss"])
-
-#                     logger.info(message)
-
-                  
-#                     writer.add_scalar('test/param_loss', test_res["test_param_loss"], test_epoch)
-
-
-#                     # if (test_res["test_param_loss"]) < best_loss:
-#                     #     logger.info('current eval loss:{}'.format(test_res["test_param_loss"]))
-#                     #     logger.info('best eval loss:{}'.format(best_loss))
-#                     #     best_loss = test_res["test_param_loss"]
-#                     #
-#                     #     torch.save({
-#                     #         'epoch': epoch,
-#                     #         'loss': best_loss,
-#                     #         'state_dict': model.state_dict(),
-#                     #         'optimizer': optimizer.state_dict(),
-#                     #     },save_path)
-#                     #     torch.save(model,model_path)
-#                     #     #----------------------------------------------------------------------#
-#                     early_stopping((test_res["test_param_loss"]), model)
-#                     # 达到早停止条件时，early_stop会被置为True
-#                     if early_stopping.early_stop:
-#                         print("Early stopping")
-#                         writer.close()
-#                         return  # 跳出迭代，结束训练
-#             CosineLR.step()
-#         writer.close()
-
-
-
-
+                        if early_stopping.early_stop:
+                            return
+                CosineLR.step()
 
 
     def predict_one(self, data: torch.Tensor, time: torch.Tensor) -> torch.Tensor:
