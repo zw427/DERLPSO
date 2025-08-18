@@ -1,8 +1,11 @@
 from scipy.integrate import odeint
 import numpy as np
 
+from equation import Equation
+from ode_equations import ODE_Equation
+from pde_equations import PDE_Equation
+
 from Estimators.estimator import Estimator
-from equation import Equation, ODE_Equation, PDE_Equation
 
 
 class DERLPSO_ALGORITHM:

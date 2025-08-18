@@ -46,8 +46,8 @@ def create_model(net_configs: dict, num_of_param: int, dim_of_data: int,
             ode_func_net = create_net(
                 latent_dim, latent_dim,
                 n_layers=net_configs['encoder']["ode_layers"],
-                n_units=net_configs['encoder']['ode_unit'],
-                nonlinear=nn.ELU, drop=False
+                hidden_dim=net_configs['encoder']['ode_unit'],
+                nonlinear=nn.ELU, dropout=False
             )
             ode_func = ODEFunc(
                 input_dim=latent_dim,
@@ -83,8 +83,8 @@ def create_model(net_configs: dict, num_of_param: int, dim_of_data: int,
             ode_func_net = create_net(
                 decoder_input_dim, decoder_input_dim,
                 n_layers=net_configs['decoder']["ode_layers"],
-                n_units=net_configs['decoder']['ode_unit'],
-                nonlinear=nn.ELU, drop=False
+                hidden_dim=net_configs['decoder']['ode_unit'],
+                nonlinear=nn.ELU, dropout=False
             )
             ode_func = ODEFunc(
                 input_dim=decoder_input_dim,
@@ -123,8 +123,8 @@ def create_model(net_configs: dict, num_of_param: int, dim_of_data: int,
         ode_func_net = create_net(
             latent_dim, latent_dim,
             n_layers=net_configs["ode_layers"],
-            n_units=net_configs['ode_unit'],
-            nonlinear=nn.ELU, drop=False
+            hidden_dim=net_configs['ode_unit'],
+            nonlinear=nn.ELU, dropout=False
         ).to(device)
         
         ode_func = ODEFunc(

@@ -69,7 +69,7 @@ class GRUUnitOriginal(nn.Module):
         """
         y_concat = torch.cat([y, x], dim=-1)
 
-        update_gate = self.update_gate(y_concat)
+        update_gate = self.update_gate(y_concat.float())
         reset_gate = self.reset_gate(y_concat)
         
         # Apply reset gate to previous state before computing new state

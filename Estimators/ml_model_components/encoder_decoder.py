@@ -38,7 +38,7 @@ class RNN(nn.Module):
         n_traj = data.shape[0]
 
         # Initialize latent state
-        prev_y = torch.zeros((n_traj, self.latent_dim), dtype=torch.float64).to(self.device)
+        prev_y = torch.zeros((n_traj, self.latent_dim)).to(self.device)
 
         latent_ys = []
         for i in range(len(time_steps)):
@@ -104,7 +104,7 @@ class ODE_RNN(nn.Module):
                 n_intermediate_tp = max(2, ((t_i - prev_t) / minimum_step).int())
 
                 time_points = linspace_vector(prev_t, t_i, n_intermediate_tp).to(self.device)
-                ode_sol = self.z0_diffeq_solver(prev_y, time_points)
+                ode_sol = self.z0_diffeq_solver(prev_y.float(), time_points)
 
                 assert not torch.isnan(ode_sol).any()
 
@@ -153,8 +153,8 @@ class VAE_ODE_RNN(nn.Module):
         n_traj = data.shape[0]
 
         # Initialize latent state and variance
-        prev_y = torch.zeros((n_traj, self.latent_dim), dtype=torch.float64).to(self.device)
-        prev_logvar = torch.zeros((n_traj, self.latent_dim), dtype=torch.float64).to(self.device)
+        prev_y = torch.zeros((n_traj, self.latent_dim)).to(self.device)
+        prev_logvar = torch.zeros((n_traj, self.latent_dim)).to(self.device)
 
         prev_t, t_i = time_steps[0], time_steps[1]
         interval_length = time_steps[-1] - time_steps[0]
@@ -178,7 +178,7 @@ class VAE_ODE_RNN(nn.Module):
                 n_intermediate_tp = max(2, ((t_i - prev_t) / minimum_step).int())
 
                 time_points = linspace_vector(prev_t, t_i, n_intermediate_tp).to(self.device)
-                ode_sol = self.z0_diffeq_solver(prev_y, time_points)
+                ode_sol = self.z0_diffeq_solver(prev_y.float(), time_points)
 
                 assert not torch.isnan(ode_sol).any()
 

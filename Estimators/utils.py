@@ -195,7 +195,7 @@ def mse_loss(output, target):
 
 
 
-
+from torch.utils.data import Dataset
 
 
 class SimpleDataSet(Dataset):

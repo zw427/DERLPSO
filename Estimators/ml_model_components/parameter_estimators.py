@@ -74,11 +74,11 @@ class EncoderDecoder(Baseline):
         Returns:
             Dictionary containing predicted parameters
         """
-        h_mu, _ = self.encoder(truth, truth_time_steps)
+        h_mu, _ = self.encoder.float()(truth.float(), truth_time_steps.float())
         
         # Concatenate flattened truth with encoded representation
         truth_flat = torch.cat((truth.flatten(1, 2), h_mu), dim=-1)
-        pred_param = self.decoder(truth_flat, truth_time_steps)
+        pred_param = self.decoder(truth_flat.float(), truth_time_steps.float())
         
         return {"pred": pred_param}
 
@@ -86,7 +86,7 @@ class EncoderDecoder(Baseline):
 class VAE(Baseline):
     """Variational Autoencoder for parameter estimation."""
     
-    def __init__(self, encoder: nn.Module, decoder: nn.Module, transform: nn.Moduloe):
+    def __init__(self, encoder: nn.Module, decoder: nn.Module, transform: nn.Module):
         """
         Initialize VAE model.
         
@@ -129,14 +129,15 @@ class VAE(Baseline):
         Returns:
             Dictionary containing predicted parameters, mean, and std
         """
-        h_mu, h_std = self.encoder(truth, truth_time_steps)
+
+        h_mu, h_std = self.encoder.float()(truth.float(), truth_time_steps.float())
         
         # Sample from the latent distribution
         z = sample_standard_gaussian(h_mu, h_std)
         
         # Transform latent variable and decode
         prior = self.transform(z)
-        pred_param = self.decoder(truth, truth_time_steps, prior)
+        pred_param = self.decoder(truth.float(), truth_time_steps.float(), prior.float())
         
         return {
             "pred": pred_param,
@@ -169,6 +170,6 @@ class Base(Baseline):
         Returns:
             Dictionary containing predicted parameters
         """
-        pred_param = self.model(truth, truth_time_steps)
+        pred_param = self.model(truth.float(), truth_time_steps)
         return {"pred": pred_param}
     

@@ -21,7 +21,7 @@ class Parameter:
         param_sampler = Parameter(distributions)
         samples = param_sampler.sample(100)
         samples.shape
-        # (20, 20)
+        # (100, 3)
         """
         self.distributions = distributions
 

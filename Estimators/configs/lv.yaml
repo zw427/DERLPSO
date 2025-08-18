@@ -4,13 +4,11 @@ Param:
     Net:
         normal: False
         max_epochs: 10000
-        load: false
         learning_rate: 1e-4
-        train_ite: 20
-        save_epoch: 3
         eval_epoch: 5
         train_batch_size: 1024
         eval_batch_size: 1024
+        
         VAE_Net:
             # encoder: only rnn or ode_rnn
             encoder:

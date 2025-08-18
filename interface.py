@@ -1,5 +1,8 @@
 
 class DE_Models: 
+    '''
+    Base class for differential equation models.
+    '''
     def __init__():
         raise NotImplementedError()
 
