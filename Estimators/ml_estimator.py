@@ -72,6 +72,7 @@ class MLEstimator(Estimator):
             # Set random seed for reproducibility
             torch.manual_seed(seed)
             torch.cuda.manual_seed_all(seed)
+            np.random.seed(seed)
 
         num_train_batches = self.train_batch_size
         num_test_batches = self.train_batch_size 

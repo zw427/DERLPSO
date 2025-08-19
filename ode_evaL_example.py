@@ -8,78 +8,75 @@ from Estimators.DERLPSO import DERLPSO
 from Estimators.RLLPSO import RLLPSO
 from Estimators.ml_estimator import MLP, RNN, ODE_RNN, VAE
 
-def evaluate_FitzHugh_Nagumo(num_data, points, seed):
-    # parameters
+
+
+def run_eval(func, config, num_data, num_state, parameter, init_data, interval, points, seed):
+    for point in points:
+        model = ODE_Models(func)
+
+        train = model.simulate(num_data * 100, parameter=parameter, init_data=init_data, 
+                               interval=interval, point=point, seed=seed + 1)
+        test = model.simulate(num_data, parameter=parameter, init_data=init_data, 
+                                   interval=interval, point=point, seed=seed)
+
+        print(f"function: {func.name}")
+
+        if True:
+            r0 = model.evaluate(DERLPSO(func), test, train, seed)
+            print("DERLPSO")
+            model.pprint(r0)
+
+        # RLLPSO
+        if True:
+            r1 = model.evaluate(RLLPSO(func), test, train, seed)
+            print("RLLPSO")
+            model.pprint(r1)
+
+        # MLP
+        if True:
+            r2 = model.evaluate(MLP(func.num_param, num_state, point, config), test, train, seed)
+            print("MLP")
+            model.pprint(r2)
+
+        # RNN
+        if True:
+            r3 = model.evaluate(RNN(func.num_param, num_state, point, config), test, train, seed)
+            print("RNN")
+            model.pprint(r3)
+
+
+        # ODE_RNN 
+        if True:
+            r4 = model.evaluate(ODE_RNN(func.num_param, num_state, point, config), test, train, seed)
+            print("ODE_RNN")
+            model.pprint(r4)
+            
+        # VAE
+        if True:
+            r5 = model.evaluate(VAE(func.num_param, num_state, point, config), test, train, seed)
+            print("VAE")
+            model.pprint(r5)
+
+
+if __name__ == "__main__":
+
     θ_0 = Normal(mu = 0.7, sigma = 0.5)
     θ_1 = Normal(mu = 0.8, sigma = 0.5)
     p0 = Parameter([θ_0, θ_1])
 
-    for point in points: 
-        fhn_model = ODE_Models(FitzHugh_Nagumo)
-        train = fhn_model.simulate(num_data, parameter=p0, init_data=[0, 0], 
-                                   interval=[0, 20], point=point, seed=seed + 1)
-        test = fhn_model.simulate(num_data * 100, parameter=p0, init_data=[0, 0], 
-                                   interval=[0, 20], point=point, seed=seed)
+    run_eval(FitzHugh_Nagumo, "Estimators/configs/fn.yaml", 10, 2, p0, [0, 0], [0, 20], [5], 100)
 
-        # DERLPSO
-        if False:
-            est0 = DERLPSO(FitzHugh_Nagumo)
-            r0 = fhn_model.evaluate(est0, test, train, seed)
-            fhn_model.pprint(r0)
+    α = Normal(mu = 0.4, sigma = 0.5)
+    β = Normal(mu = 1.3, sigma = 0.5)
+    δ = Normal(mu = 1, sigma = 0.5)
+    γ = Normal(mu = 1, sigma = 0.5)
+    p1 = Parameter([α, β, δ, γ])
+    run_eval(Lotka_Volterra, "Estimators/configs/lovo.yaml", 10, 2, p1, [0.9, 0.9], [0, 4], [5], 100)
 
-        # MLP
-        if False:
-            est1 = MLP(FitzHugh_Nagumo.num_param, 2, point, "Estimators/configs/fn.yaml")
-            r1 = fhn_model.evaluate(est1, test, train, seed)
-            fhn_model.pprint(r1)
+    σ = Normal(mu=2, sigma=0.5)
+    β = Normal(mu=4, sigma=0.5)
+    r = Normal(mu=1, sigma=0.5)
 
-        # RNN
-        if False:
-            est2 = RNN(FitzHugh_Nagumo.num_param, 2, point, "Estimators/configs/fn.yaml")
-            r2 = fhn_model.evaluate(est2, test, train, seed)
-            fhn_model.pprint(r2)
-
-
-        # ODE_RNN 
-        if False:
-            est3 = ODE_RNN(FitzHugh_Nagumo.num_param, 2, point, "Estimators/configs/fn.yaml")
-            r3 = fhn_model.evaluate(est3, test, train, seed)
-            fhn_model.pprint(r3)
-
-        # VAE
-        if False:
-            est4 = VAE(FitzHugh_Nagumo.num_param, 2, point, "Estimators/configs/fn.yaml")
-            r4 = fhn_model.evaluate(est4, test, train, seed)
-            fhn_model.pprint(r4)
-
-        if True:
-            est5 = RLLPSO(FitzHugh_Nagumo)
-            r5 = fhn_model.evaluate(est5, test, train, seed)
-            fhn_model.pprint(r5)
-            
-
-
-# p1 = Parameter([Normal(mu=[0.4, 1.3, 1, 1], sigma=[0.5, 0.5, 0.5, 0.5])])
-
-# lv_model = ODE_Models(Lotka_Volterra)
-# test1 = lv_model.simulate(10, parameter=p1, init_data=[0.9, 0.9], 
-#                    interval=[0, 4], point=5, seed=100)
-
-# est1 = DERLPSO(Lotka_Volterra)
-# r1 = lv_model.evaluate(est1, test1['data'], test1['time'], test1['param'], seed=100)
-
-
-
-# p2 = Parameter([Normal(mu=[2, 4, 1], sigma=[0.5, 0.5, 0.5])])
-
-# lz_model = ODE_Models(Lorenz)
-# test2 = lz_model.simulate(10, parameter=p2, init_data=[0, 1, 1.25], 
-#                    interval=[0, 4], point=5, seed=100)
-
-# est2 = DERLPSO(Lorenz)
-# r2 = lz_model.evaluate(est2, test2['data'], test2['time'], test2['param'], seed=100)
-
-
-if __name__ == "__main__":
-    # evaluate_FitzHugh_Nagumo(100, [5, 10, 20])
-    evaluate_FitzHugh_Nagumo(10, [5], 100)
+    p2 = Parameter([σ, β, r])
+    run_eval(Lorenz, "Estimators/configs/lv.yaml", 10, 3, p2, [0, 1, 1.25], [0, 4], [5], 100)
+    

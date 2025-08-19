@@ -118,4 +118,6 @@ class ODE_Models(DE_Models):
         '''
         Pretty print the results of the evaluation.
         '''
-        print(output)
+        print(f'param error mean: {output["error"].mean(axis=0)}')
+        print(f'MSE mean: {output["mse"].mean()}')
+        print(f'MSE std: {output["mse"].std()}')
