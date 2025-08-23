@@ -1,4 +1,4 @@
-device: cpu #TODO
+device: cuda:0
 
 Param:
     Net:

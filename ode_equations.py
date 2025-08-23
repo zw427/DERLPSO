@@ -6,7 +6,7 @@ from equation import Equation
 class ODE_Equation(Equation):
     def __init__(self, name: str, func: Callable[..., List[float]], num_param: int):
         super().__init__(name, 'ODE', func, num_param)
-        self.t_first =  list(signature(func).parameters.keys())[0] == 't'
+        self.t_first = list(signature(func).parameters.keys())[0] == 't'
 
 
 def FitzHugh_Nagumo_func(t, state, param, ξ=-0.4, γ=3.0):

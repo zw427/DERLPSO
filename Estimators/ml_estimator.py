@@ -1,22 +1,15 @@
-
-# Standard library
 import os
-import time as timer
+import random
 from typing import Optional
 
-# Third-party
 import torch
 import torch.optim as optim
-import pandas as pd
-from torch.distributions import Normal, Independent, kl_divergence
+from torch.nn import functional as F
+from torch.distributions import Normal, kl_divergence
 
-# Local imports
-from .estimator import Estimator
-from .ml_model_components import *
-from .ml_model_components.create_model import create_model
-from .utils import *
-from equation import Equation
-
+from Estimators.estimator import Estimator
+from Estimators.ml_model_components.create_model import create_model
+from Estimators.utils import *
 
 
 class MLEstimator(Estimator):
@@ -33,7 +26,6 @@ class MLEstimator(Estimator):
             config: Path to configuration file
             model_path: Path to pre-trained model (optional)
         """
-        # torch.set_default_dtype(torch.float64)
 
         # Store basic attributes
         self.model_type = model_type
@@ -45,6 +37,8 @@ class MLEstimator(Estimator):
         self.config = load_configure(config, model_type)
         
         # Set device
+        if "cuda" in self.config['device'] and not torch.cuda.is_available():
+            self.config['device'] = 'cpu'
         self.device = torch.device(self.config['device'])
         
         # Extract configuration parameters
@@ -66,23 +60,31 @@ class MLEstimator(Estimator):
                 time_points, model_type, self.device
             ).float().to(self.device)
     
-    def train(self, train: dict, seed: int = None):
+    def mse_loss(output, target):
+        ''' 
+        Mean Squared Error loss function.
+        '''
+        return F.mse_loss(output, target, reduction='mean')
 
+    def train(self, train: dict, seed: int = None):
+        '''
+        Train the model using the provided training data.
+        '''
         if seed:
             # Set random seed for reproducibility
+            random.seed(seed)
+            np.random.seed(seed)
             torch.manual_seed(seed)
             torch.cuda.manual_seed_all(seed)
-            np.random.seed(seed)
 
         num_train_batches = self.train_batch_size
-        num_test_batches = self.train_batch_size 
+        num_test_batches = self.train_batch_size
 
-        time_points = train["time"].shape[-1]
         data = train['data']
         time = train['time']
         param = train['param']
 
-        train_dict, test_dict = split_data(data, time, param, train_fraq = 0.6)
+        train_dict, test_dict = split_data(data, time, param, train_frac = 0.6)
 
         train_dataset = SimpleDataSet(train_dict)
         test_dataset = SimpleDataSet(test_dict)
@@ -98,9 +100,7 @@ class MLEstimator(Estimator):
         
         CosineLR = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5, eta_min=1e-6)
     
-
         current_epoch = 0
-        best_loss = float("inf")
 
         self.model.to(self.device)
 
@@ -125,19 +125,19 @@ class MLEstimator(Estimator):
                 train_res["train_param_loss"] = 0.
                 train_res["train_kl_loss"] = 0.
 
-                total_loss=0.
+                total_loss = 0.
 
-                for step, (data, param, u_samples, time) in enumerate(train_dataset):
+                for step, (data, param, time) in enumerate(train_dataset):
 
                     data = data.type(torch.float)
                     param = param.type(torch.float)
                     time = time.type(torch.float)
 
-                    true_param=param.to(self.device)
+                    true_param = param.to(self.device)
                     data_encoder = data.detach().to(self.device)
-                    enc_time = torch.tensor(time[0,:]).to(self.device)
+                    enc_time = time[0,:].detach().clone().requires_grad_(True).to(self.device)
 
-                    pred_param,pred_mu,pred_std= self.model.compute(data_encoder,enc_time)
+                    pred_param, pred_mu, pred_std = self.model.compute(data_encoder, enc_time)
 
                     #loss--klv
                     fp_distr = Normal(pred_mu,pred_std)
@@ -145,14 +145,13 @@ class MLEstimator(Estimator):
                     train_kld = torch.mean(kldiv_z0_gau)
 
                     #loss--mse,likelihood
-                    train_param_loss = mse_loss(true_param, pred_param)
+                    train_param_loss = MLEstimator.mse_loss(true_param, pred_param)
 
                     total_loss = train_param_loss+total_loss+train_kld
 
                     result = {}
                     result["train_param_loss"] = train_param_loss.item()
                     result["train_kl_loss"] = train_kld.item()
-
 
                     #cal loss
                     for key in train_res.keys():
@@ -162,43 +161,35 @@ class MLEstimator(Estimator):
                                 var = var.detach()
                             train_res[key] += var
 
-                message = 'Epoch {:04d},[Train |  KLD_loss {:.4f}param_loss {:.4f} '.format(
-                            epoch, train_res["train_kl_loss"], train_res["train_param_loss"])
-                
                 #backwards
                 total_loss.backward()
                 optimizer.step()
                 
                 test_total_loss = 0.
                 if epoch % self.eval_epoch == 0:
-                    test_epoch = int(epoch/self.eval_epoch)
                     with torch.no_grad():
                         test_res = {}
                         test_res["test_kl_loss"] = 0.
                         test_res["test_param_loss"] = 0.
 
-                        for step, (data, param,u_samples, time) in enumerate(test_dataset):
-                            #true_param = torch.cat((rho, sigma, param), dim=-1)
+                        for step, (data, param, time) in enumerate(test_dataset):
 
                             data = data.type(torch.float)
                             param = param.type(torch.float)
                             time = time.type(torch.float)
 
-                    
                             true_param=param.to(self.device)
 
                             data_encoder = data.to(self.device)
-                            enc_time = torch.tensor(time[0,:]).to(self.device)
-                            pred_param,pred_mu,pred_std = self.model.compute(data_encoder,enc_time)
+                            enc_time = time[0,:].detach().clone().requires_grad_(True).to(self.device)
+                            pred_param, pred_mu, pred_std = self.model.compute(data_encoder, enc_time)
 
                             fp_distr = Normal(pred_mu, pred_std)
 
                             kldiv_z0_gau = kl_divergence(fp_distr, prior)
 
                             test_kld = torch.mean(kldiv_z0_gau)
-
-                            test_param_loss = mse_loss(true_param, pred_param)
-
+                            test_param_loss = MLEstimator.mse_loss(true_param, pred_param)
 
                             test_total_loss = test_total_loss + test_param_loss+test_kld
 
@@ -213,83 +204,73 @@ class MLEstimator(Estimator):
                                         var = var.detach()
                                     test_res[key] += var
 
-                        message = 'Epoch {:04d},[Test | KLD_loss {:.4f} |  param_loss {:.4f} '.format(
-                            test_epoch,  test_res["test_kl_loss"],test_res["test_param_loss"])
+                        early_stopping((test_res["test_param_loss"] + test_res["test_kl_loss"]), self.model)
 
-
-                        early_stopping((test_res["test_param_loss"]+test_res["test_kl_loss"]), self.model)
                         if early_stopping.early_stop:
                             print("Early stopping")
                             return
-
                 CosineLR.step()
-
         else:
             for epoch in range(current_epoch, self.max_epoch):
                 optimizer.zero_grad()
 
                 train_res = {}
-                # train_res["loss"] = 0.
-                # train_res["train_param_likelihood"] = 0.
                 train_res["train_param_loss"] = 0.
 
                 total_loss = 0.
 
-                for step, (data, param, u_samples, time) in enumerate(train_dataset):
+                for step, (data, param, time) in enumerate(train_dataset):
 
-                        data = data.type(torch.float)
-                        param = param.type(torch.float)
-                        time = time.type(torch.float)
+                    data = data.type(torch.float)
+                    param = param.type(torch.float)
+                    time = time.type(torch.float)
 
-                        true_param = param.to(self.device)
+                    true_param = param.to(self.device)
 
-                        data_encoder = data.detach().to(self.device)
-                        enc_time = torch.tensor(time[0,:]).to(self.device)
+                    data_encoder = data.detach().to(self.device)
+                    enc_time = time[0,:].detach().clone().requires_grad_(True).to(self.device)
 
-                        pred_param = self.model.compute(data_encoder,enc_time)
+                    pred_param = self.model.compute(data_encoder, enc_time)
 
-                        train_param_loss = mse_loss(true_param, pred_param)
-                    
-                        total_loss = train_param_loss + total_loss
+                    train_param_loss = MLEstimator.mse_loss(true_param, pred_param)
+                
+                    total_loss = train_param_loss + total_loss
 
-                        result = {}
+                    result = {}
 
-                        result["train_param_loss"] = train_param_loss.item()
+                    result["train_param_loss"] = train_param_loss.item()
 
-                        # cal loss
-                        for key in train_res.keys():
-                            if key in result.keys():
-                                var = result[key]
-                                if isinstance(var, torch.Tensor):
-                                    var = var.detach()
-                                train_res[key] += var
+                    # cal loss
+                    for key in train_res.keys():
+                        if key in result.keys():
+                            var = result[key]
+                            if isinstance(var, torch.Tensor):
+                                var = var.detach()
+                            train_res[key] += var
 
-                # backwards
                 total_loss.backward()
                 optimizer.step()
 
                 test_total_loss = 0.
                 if epoch % self.eval_epoch == 0:
                     self.model.eval()
-                    test_epoch = int(epoch / self.eval_epoch)
                     with torch.no_grad():
                         test_res = {}
                         test_res["test_param_loss"] = 0.
-                        for step, (data,  param, u_samples,time) in enumerate(train_dataset):
+                        for step, (data, param, time) in enumerate(train_dataset):
 
                             data = data.type(torch.float)
                             param = param.type(torch.float)
                             time = time.type(torch.float)
 
-                            true_param=param.to(self.device)
+                            true_param = param.to(self.device)
 
-                            data_encoder =data.detach().to(self.device)
-                            enc_time = torch.tensor(time[0,:]).to(self.device)
+                            data_encoder = data.detach().to(self.device)
+                            enc_time = time[0,:].detach().clone().requires_grad_(True).to(self.device)
 
+                            pred_param = self.model.compute(data_encoder, enc_time)
 
-                            pred_param= self.model.compute(data_encoder,enc_time)
-
-                            test_param_loss = mse_loss(true_param, pred_param)
+                            test_param_loss = MLEstimator.mse_loss(true_param, pred_param)
                             test_total_loss = test_total_loss + test_param_loss
 
                             result = {}
@@ -301,7 +282,6 @@ class MLEstimator(Estimator):
                                     if isinstance(var, torch.Tensor):
                                         var = var.detach()
                                     test_res[key] += var
-
 
                         early_stopping((test_res["test_param_loss"]), self.model)
 
@@ -324,20 +304,26 @@ class MLEstimator(Estimator):
         self.model.eval()
         return self.model.compute(data.to(self.device), time.to(self.device))
 
-    def predict(self, data, time):
+    def predict(self, data, time, seed: int = None):
         """
-        Predict parameters for test data and optionally calculate metrics.
+        Predict parameters for the provided dataset.
         
         Args:
-            data_file: Path to data file
-            time_file: Path to time file
-            param_file: Path to parameter file (optional, for evaluation)
-            save_dir: Directory to save results (optional)
+            data: Input data tensor of shape (batch_size, sequence_length, features)
+            time: Time points tensor of shape (sequence_length,) or (batch_size, sequence_length)
+            seed: Random seed for reproducibility (optional)
             
         Returns:
-            If param_file provided: (predictions, truth, mse_losses)
-            If param_file not provided: predictions
+            Numpy array of predicted parameters
         """
+
+        if seed:
+            # Set random seed for reproducibility
+            random.seed(seed)
+            np.random.seed(seed)
+            torch.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed)
+        
         # Load and prepare data
         dataset = SimpleDataSet({'data': data, 'time': time})
 
@@ -349,7 +335,7 @@ class MLEstimator(Estimator):
         self.model.eval()
         with torch.no_grad():
             prediction = []
-            for data, _, _, time in dataset:
+            for data, _, time in dataset:
 
                 predicted_param = self.predict_one(data, time[0, :])
 

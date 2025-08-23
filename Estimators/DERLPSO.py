@@ -164,8 +164,8 @@ class DERLPSO_ALGORITHM:
                     self.V[i] = [np.random.uniform(-self.upper, self.upper)
                             for _ in range(self.param_num)]
                 elif isinstance(self.func, PDE_Equation):
-                    self.X[i] = [np.uniform(0, self.upper) for _ in range(self.paramNum)]
-                    self.V[i] = [np.random.uniform(0, self.upper) for _ in range(self.paramNum)]
+                    self.X[i] = [np.random.uniform(0, self.upper) for _ in range(self.param_num)]
+                    self.V[i] = [np.random.uniform(0, self.upper) for _ in range(self.param_num)]
             
             self.p_best[i] = self.X[i]
             tmp = self.mse_loss(self.X[i])
@@ -283,7 +283,7 @@ class DERLPSO(Estimator):
 
     def predict(self, data, time):
         estimator = DERLPSO_ALGORITHM(
-            self.func, data, time,  # Fixed: was passing list(time) but constructor expects times
+            self.func, data, time,
             self.particle_num, self.max_iter, self.layers_list,
             self.upper, self.lower, self.threshold
         )

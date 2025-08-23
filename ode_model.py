@@ -1,4 +1,5 @@
 from typing import List
+import random 
 
 import numpy as np
 import scipy
@@ -33,7 +34,9 @@ class ODE_Models(DE_Models):
         assert len(interval) == 2, "interval must have exactly two floats [start, end]"
         
         # set seed if any
-        np.random.seed(seed) if seed else None
+        if seed:
+            np.random.seed(seed)
+        rng = np.random.default_rng(seed)
 
         # prepare inputs to integrate
         time_points = np.linspace(interval[0], interval[1], point)
@@ -41,7 +44,7 @@ class ODE_Models(DE_Models):
 
         while len(data_list) < num_data:
             try:
-                args = parameter.sample()
+                args = parameter.sample(rng = rng)
                 args = np.abs(args.squeeze())
                 y0 = np.array(init_data)
 
@@ -64,11 +67,15 @@ class ODE_Models(DE_Models):
 
         return {'data': data, 'param': param, 'time': time}
 
-    def parameter_est(self, estimator: Estimator, data: np.ndarray, time: np.ndarray) -> np.ndarray:
+    def parameter_est(self, estimator: Estimator, data: np.ndarray, time: np.ndarray, seed: int = None) -> np.ndarray:
         '''
         Estimate parameters using the provided estimator and data.
         '''
-        return estimator.predict(data, time)
+        if isinstance(estimator, MLEstimator):
+            return estimator.predict(data, time, seed)
+        else:
+            return estimator.predict(data, time)
+        
 
     def evaluate(self, estimator: Estimator, test_set: dict, train_set: dict = None, 
                  seed: int = None) -> dict:
@@ -85,13 +92,15 @@ class ODE_Models(DE_Models):
         assert set(['data', 'time', 'param']).issubset(set(train_set.keys())) if train_set else None
 
         # set seed if any
-        np.random.seed(seed) if seed else None
+        if seed:
+            np.random.seed(seed)
+            random.seed(seed)
 
         # if ML Estimator, then train on train_set (can batch predict)
         if isinstance(estimator, MLEstimator):
             assert train_set is not None
             estimator.train(train_set, seed)
-            prediction = self.parameter_est(estimator, data, time)
+            prediction = self.parameter_est(estimator, data, time, seed)
         else:
             # get predictions from estimator
             prediction = np.zeros((data.shape[0], self.equation.num_param))
@@ -114,10 +123,22 @@ class ODE_Models(DE_Models):
         # return data, time, param, prediction, error, and mse
         return test_set | {'prediction': prediction, 'error': error, 'mse': mse}
     
-    def pprint(self, output: dict, file: str = None):
+    def pprint(self, output: dict, estimator_name: str, file: str = None):
         '''
-        Pretty print the results of the evaluation.
+        Pretty print (or save) the results of the evaluation.
         '''
-        print(f'param error mean: {output["error"].mean(axis=0)}')
-        print(f'MSE mean: {output["mse"].mean()}')
-        print(f'MSE std: {output["mse"].std()}')
+        txt = f'''
+        ##################################################\n
+        ODE Equation: {self.equation.name}\n
+        Estimator   : {estimator_name}\n
+        --------------------------------------------------\n
+        Parameter Error Mean: {output["error"].mean(axis=0)}\n
+        Parameter Error Std : {output["error"].std(axis=0)}\n
+        MSE Mean            : {output["mse"].mean()}\n
+        MSE Std             : {output["mse"].std()}\n
+        ##################################################\n\n\n
+        '''
+        print(txt)
+        if file:
+            with open(file, 'a') as f:
+                f.write(txt)

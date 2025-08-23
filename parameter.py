@@ -25,11 +25,12 @@ class Parameter:
         """
         self.distributions = distributions
 
-    def sample(self, n: int = 1) -> np.ndarray:
+    def sample(self, n: int = 1, rng: np.random.Generator = None) -> np.ndarray:
         """
         Sample n values from each distribution and concatenate results column-wise.
         """
-        samples = [dist.sample((n, 1)).squeeze(1) for dist in self.distributions]
+        # must use np.random.Generator to ensure replication
+        samples = [dist.sample((n, 1), rng=rng).squeeze(1) for dist in self.distributions]
         # Ensure each sample is 2D for concatenation
         samples = [np.expand_dims(s, 1) if s.ndim == 1 else s for s in samples]
         return np.concat(samples, axis=1)
