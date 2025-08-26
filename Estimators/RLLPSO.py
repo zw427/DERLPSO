@@ -4,12 +4,14 @@ from scipy.integrate import odeint
 from equation import Equation
 
 from Estimators.estimator import Estimator
+from ode_equations import ODE_Equation
+from pde_equations import PDE_Equation
 
 
 class PSO_ALGORITHM:
     def __init__(self, func: Equation, data, times, particle_num=100,
                  max_iter=200, layers_list=[4, 6, 8, 10], 
-                 upper=10, lower=1e-10):
+                 upper=10, lower=1e-10, regularization=False):
         
         self.func = func
         self.r1 = 0
@@ -29,14 +31,22 @@ class PSO_ALGORITHM:
         self.p_fit = np.zeros(self.pN)
         self.fit = 1e20
 
-        self.initial_conditions = data[0, ]
-        self.t = times
-        self.actual_data = data
+        if isinstance(self.func, ODE_Equation):
+            self.initial_conditions = data[0, ]
+            self.t = times
+            self.actual_data = data
+        elif isinstance(self.func, PDE_Equation):
+            self.actual_data = data
+            self.t = None
+            self.initial_conditions = None
+        else:
+            raise Exception("Only ODEs and PDEs are supported.")
 
         self.numberOfLayers_list = layers_list
         self.qTable = np.zeros((len(self.numberOfLayers_list), len(self.numberOfLayers_list)))
         self.preState = 0
         self.currentState = 0
+        self.regularization = regularization
 
         self.layers = []
 
@@ -53,10 +63,18 @@ class PSO_ALGORITHM:
 
     def mse_loss(self, X):
         """Calculate MSE loss between predicted and actual data."""
+        
         temp_x = tuple(X),
-        predicted_data = odeint(self.func.f(), self.initial_conditions, self.t,
+        if isinstance(self.func, ODE_Equation):
+            predicted_data = odeint(self.func.f(), self.initial_conditions, self.t,
                                     args=temp_x, tfirst=self.func.t_first)
-        mse = np.mean((self.actual_data - predicted_data) ** 2)
+        elif isinstance(self.func, PDE_Equation):
+            predicted_data = self.func.f()(X)
+
+        if self.regularization:
+            mse = (1 + np.linalg.norm(X)) * np.mean((self.actual_data - predicted_data) ** 2) + 0.01 * np.linalg.norm(X)
+        else:
+            mse = np.mean((self.actual_data - predicted_data) ** 2)
         return mse
 
     def select_action(self):
@@ -132,8 +150,13 @@ class PSO_ALGORITHM:
                 self.X[i] = np.exp(np.log(self.lower) + np.log(self.upper / self.lower) * np.random.uniform(0, 1, self.dim)) * np.random.choice([-1, 1], self.dim)
                 self.V[i] = np.exp(np.log(self.lower) + np.log(self.upper / self.lower) * np.random.uniform(0, 1, self.dim)) * np.random.choice([-1, 1], self.dim)
             else:
-                self.X[i] = [np.random.uniform(-10, 10) for _ in range(self.dim)]
-                self.V[i] = [np.random.uniform(-10, 10) for _ in range(self.dim)]
+                if isinstance(self.func, ODE_Equation):
+                    self.X[i] = [np.random.uniform(-10, 10) for _ in range(self.dim)]
+                    self.V[i] = [np.random.uniform(-10, 10) for _ in range(self.dim)]
+                elif isinstance(self.func, PDE_Equation):
+                    self.X[i] = [np.random.uniform(0, self.upper) for _ in range(self.dim)]
+                    self.V[i] = [np.random.uniform(0, self.upper) for _ in range(self.dim)]
+
             self.pBest[i] = self.X[i]
             tmp = self.mse_loss(self.X[i])
             self.p_fit[i] = tmp
@@ -225,13 +248,14 @@ class PSO_ALGORITHM:
 
 class RLLPSO(Estimator):
     def __init__(self, func: Equation, particle_num=100, max_iter=200, 
-                 layers_list=[4, 6, 8, 10], upper=10, lower=1e-10):
+                 layers_list=[4, 6, 8, 10], upper=10, lower=1e-10, regularization=False):
         self.func = func
         self.particle_num = particle_num
         self.max_iter = max_iter
         self.layers_list = layers_list
         self.upper = upper
         self.lower = lower
+        self.regularization = regularization
 
     def train(self):
         raise Exception("RLLPSO does not need to train.")
@@ -240,7 +264,7 @@ class RLLPSO(Estimator):
         estimator = PSO_ALGORITHM(
             self.func, data, time,
             self.particle_num, self.max_iter, self.layers_list,
-            self.upper, self.lower
+            self.upper, self.lower, self.regularization
         )
         estimator.init_population()
         estimator.iterator()
