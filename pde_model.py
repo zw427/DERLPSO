@@ -1,11 +1,13 @@
 import random
-from typing import List
+from typing import Union
+
 import numpy as np
+from scipy.stats import truncnorm
 
 from pde_equations import PDE_Equation
 from interface import DE_Models
 from Estimators.estimator import Estimator
-from scipy.stats import truncnorm
+
 
 class PDE_Models(DE_Models):
 
@@ -15,11 +17,15 @@ class PDE_Models(DE_Models):
         '''
         self.equation = equation
 
-    def integrate(self, X: List[float]) -> np.ndarray:
+    def integrate(self, X: Union[np.ndarray, float]) -> np.ndarray:
         '''
         Integrate the ODE system defined by the equation with given parameters.
         '''
-        print(X)
+        # if X is single element np.ndarray, .tolist() makes it a Python float
+        if isinstance(X, np.ndarray):
+            X = X.tolist()
+        if isinstance(X, float):
+            X = [X]
         return self.equation.f()(X)
 
     def simulate(self, num_data: int, 
@@ -67,7 +73,7 @@ class PDE_Models(DE_Models):
         # mse of each sample
         mse = np.zeros((data.shape[0]))
         for i in range(data.shape[0]):
-            prediction_data = self.integrate([prediction[i].squeeze()])
+            prediction_data = self.integrate(prediction[i].squeeze())
             mse[i] = np.mean((data[i] - prediction_data) ** 2)
         
         # return data, time, param, prediction, error, and mse
@@ -85,6 +91,7 @@ class PDE_Models(DE_Models):
         --------------------------------------------------\n
         Parameter Error Mean: {output["error"].mean(axis=0)}\n
         Parameter Error Std : {output["error"].std(axis=0)}\n
+        MSE Median          : {np.median(output["mse"])}\n
         MSE Mean            : {output["mse"].mean()}\n
         MSE Std             : {output["mse"].std()}\n
         ##################################################\n\n\n
@@ -93,4 +100,3 @@ class PDE_Models(DE_Models):
         if file:
             with open(file, 'a') as f:
                 f.write(txt)
-

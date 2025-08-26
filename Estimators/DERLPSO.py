@@ -11,7 +11,7 @@ from Estimators.estimator import Estimator
 class DERLPSO_ALGORITHM:
     def __init__(self, func: Equation, data, times, particle_num=100,
                  max_iter=200, layers_list=[4, 6, 8, 10], upper=10,
-                 lower=1e-10, threshold=1e-04):
+                 lower=1e-10, threshold=1e-04, regularization=False):
 
         self.func = func
         self.upper = upper
@@ -20,6 +20,7 @@ class DERLPSO_ALGORITHM:
         self.param_num = func.num_param
         self.max_iter = max_iter
         self.layers_list = layers_list
+        self.regularization = regularization
 
         # Initialize particle arrays
         self.X = np.zeros((self.particle_num, self.param_num))
@@ -74,7 +75,10 @@ class DERLPSO_ALGORITHM:
         elif isinstance(self.func, PDE_Equation):
             predicted_data = self.func.f()(X)
 
-        mse = np.mean((self.data - predicted_data) ** 2)
+        if self.regularization:
+            mse = (1 + np.linalg.norm(X)) * np.mean((self.data - predicted_data) ** 2) + 0.01 * np.linalg.norm(X)
+        else:
+            mse = np.mean((self.data - predicted_data) ** 2)
         return mse
 
     def select_action(self):
@@ -269,7 +273,7 @@ class DERLPSO_ALGORITHM:
 class DERLPSO(Estimator):
     def __init__(self, func: Equation, particle_num=100,
                  max_iter=200, layers_list=[4, 6, 8, 10], upper=10,
-                 lower=1e-10, threshold=1e-04):
+                 lower=1e-10, threshold=1e-04, regularization=False):
         self.func = func
         self.particle_num = particle_num
         self.max_iter = max_iter
@@ -277,6 +281,7 @@ class DERLPSO(Estimator):
         self.upper = upper
         self.lower = lower
         self.threshold = threshold
+        self.regularization = regularization
         
     def train(self):
         raise Exception("DERLPSO does not need to train.")
@@ -285,7 +290,7 @@ class DERLPSO(Estimator):
         estimator = DERLPSO_ALGORITHM(
             self.func, data, time,
             self.particle_num, self.max_iter, self.layers_list,
-            self.upper, self.lower, self.threshold
+            self.upper, self.lower, self.threshold, self.regularization
         )
         estimator.init_particles()
         estimator.iterator()

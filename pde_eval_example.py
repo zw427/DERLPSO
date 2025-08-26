@@ -8,16 +8,16 @@ from pde_model import PDE_Models
 SEED = 100
 NUM_DATA = 2
 
-## HEAT
-# heat = create_heat_function(nx=5, tx=5, Lx=1, Lt=1)
-# heat_model = PDE_Models(heat)
+# HEAT
+heat = create_heat_function(nx=5, tx=5, Lx=1, Lt=1)
+heat_model = PDE_Models(heat)
 
-# heat_α = heat_model.simulate(NUM_DATA, mu=0.5, sigma=0.5, lower=0.0001, upper=1.0, seed=SEED)
-# data = [heat.f()([a]) for a in heat_α]
-# test_set = {'param': np.array(heat_α).reshape(-1,1), 'data': np.array(data)} 
+heat_α = heat_model.simulate(NUM_DATA, mu=0.5, sigma=0.5, lower=0.0001, upper=1.0, seed=SEED)
+data = [heat.f()([a]) for a in heat_α]
+test_set = {'param': np.array(heat_α).reshape(-1,1), 'data': np.array(data)} 
 
-# r0 = heat_model.evaluate(DERLPSO(heat), test_set, seed = SEED)
-# heat_model.pprint(r0, "DERLPSO")
+r0 = heat_model.evaluate(DERLPSO(heat), test_set, seed = SEED)
+heat_model.pprint(r0, "DERLPSO")
 
 
 ## TRANSIENT
@@ -27,8 +27,8 @@ transient_model = PDE_Models(transient)
 transient_D = transient_model.simulate(NUM_DATA, mu=0.5, sigma=0.5, lower=0.0001, upper=1.0, seed=SEED+1)
 transient_v = transient_model.simulate(NUM_DATA, mu=0.5, sigma=0.5, lower=0.0001, upper=1.0, seed=SEED+2)
 data = [transient.f()([D, v]) for D, v in zip(transient_D, transient_v)]
-test_set = {'param': np.array(list(zip(transient_D, transient_v))), 'data': np.array(data)}
 
+test_set = {'param': np.array(list(zip(transient_D, transient_v))), 'data': np.array(data)}
 r1 = transient_model.evaluate(DERLPSO(transient), test_set, seed = SEED)
 transient_model.pprint(r1, "DERLPSO")
 

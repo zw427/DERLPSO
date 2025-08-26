@@ -134,6 +134,7 @@ class ODE_Models(DE_Models):
         --------------------------------------------------\n
         Parameter Error Mean: {output["error"].mean(axis=0)}\n
         Parameter Error Std : {output["error"].std(axis=0)}\n
+        MSE Median          : {np.median(output["mse"])}\n
         MSE Mean            : {output["mse"].mean()}\n
         MSE Std             : {output["mse"].std()}\n
         ##################################################\n\n\n

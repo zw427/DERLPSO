@@ -85,8 +85,8 @@ def create_transient_function(nx=5, steps=None, Lx=1.0, Lt=1.0):
         steps = nx
         
     def transient_custom(X):
-        diffCoeff = X[0][0]
-        convCoeff = X[0][1]
+        diffCoeff = X[0]
+        convCoeff = (X[1],)
         mesh = Grid1D(dx=Lx / nx, nx=nx)
         timeStepDuration = Lt / steps
         f_phi0 = lambda x: (20 * x - 11) / 9
