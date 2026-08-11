@@ -9,10 +9,18 @@ from pde_equations import PDE_Equation
 
 
 class PSO_ALGORITHM:
-    def __init__(self, func: Equation, data, times, particle_num=100,
-                 max_iter=200, layers_list=[4, 6, 8, 10], 
-                 upper=10, lower=1e-10, regularization=False):
-        
+    def __init__(
+        self,
+        func: Equation,
+        data,
+        times,
+        particle_num=100,
+        max_iter=200,
+        layers_list=[4, 6, 8, 10],
+        upper=10,
+        lower=1e-10,
+        regularization=False,
+    ):
         self.func = func
         self.r1 = 0
         self.r2 = 0
@@ -32,7 +40,7 @@ class PSO_ALGORITHM:
         self.fit = 1e20
 
         if isinstance(self.func, ODE_Equation):
-            self.initial_conditions = data[0, ]
+            self.initial_conditions = data[0,]
             self.t = times
             self.actual_data = data
         elif isinstance(self.func, PDE_Equation):
@@ -43,7 +51,9 @@ class PSO_ALGORITHM:
             raise Exception("Only ODEs and PDEs are supported.")
 
         self.numberOfLayers_list = layers_list
-        self.qTable = np.zeros((len(self.numberOfLayers_list), len(self.numberOfLayers_list)))
+        self.qTable = np.zeros(
+            (len(self.numberOfLayers_list), len(self.numberOfLayers_list))
+        )
         self.preState = 0
         self.currentState = 0
         self.regularization = regularization
@@ -63,16 +73,23 @@ class PSO_ALGORITHM:
 
     def mse_loss(self, X):
         """Calculate MSE loss between predicted and actual data."""
-        
-        temp_x = tuple(X),
+
+        temp_x = (tuple(X),)
         if isinstance(self.func, ODE_Equation):
-            predicted_data = odeint(self.func.f(), self.initial_conditions, self.t,
-                                    args=temp_x, tfirst=self.func.t_first)
+            predicted_data = odeint(
+                self.func.f(),
+                self.initial_conditions,
+                self.t,
+                args=temp_x,
+                tfirst=self.func.t_first,
+            )
         elif isinstance(self.func, PDE_Equation):
             predicted_data = self.func.f()(X)
 
         if self.regularization:
-            mse = (1 + np.linalg.norm(X)) * np.mean((self.actual_data - predicted_data) ** 2) + 0.01 * np.linalg.norm(X)
+            mse = (1 + np.linalg.norm(X)) * np.mean(
+                (self.actual_data - predicted_data) ** 2
+            ) + 0.01 * np.linalg.norm(X)
         else:
             mse = np.mean((self.actual_data - predicted_data) ** 2)
         return mse
@@ -80,7 +97,7 @@ class PSO_ALGORITHM:
     def select_action(self):
         """
         Select action using epsilon-greedy strategy.
-        
+
         Returns:
             Selected number of layers
         """
@@ -96,7 +113,7 @@ class PSO_ALGORITHM:
     def divide_particles(self, currentTotalLayer, fitness):
         """
         Divide particles into layers based on fitness.
-        
+
         Args:
             current_total_layer: Current number of layers
             fitness: Fitness values of all particles
@@ -118,11 +135,11 @@ class PSO_ALGORITHM:
     def level_competition(self, lec, FECount):
         """
         Perform level competition to select exemplar levels.
-        
+
         Args:
             lec: Current level
             fe_count: Function evaluation count
-            
+
         Returns:
             List of two exemplar levels
         """
@@ -146,16 +163,28 @@ class PSO_ALGORITHM:
     def init_population(self):
         """Initialize population with random positions and velocities."""
         for i in range(self.pN):
-            if (i <= self.pN / 2):
-                self.X[i] = np.exp(np.log(self.lower) + np.log(self.upper / self.lower) * np.random.uniform(0, 1, self.dim)) * np.random.choice([-1, 1], self.dim)
-                self.V[i] = np.exp(np.log(self.lower) + np.log(self.upper / self.lower) * np.random.uniform(0, 1, self.dim)) * np.random.choice([-1, 1], self.dim)
+            if i <= self.pN / 2:
+                self.X[i] = np.exp(
+                    np.log(self.lower)
+                    + np.log(self.upper / self.lower)
+                    * np.random.uniform(0, 1, self.dim)
+                ) * np.random.choice([-1, 1], self.dim)
+                self.V[i] = np.exp(
+                    np.log(self.lower)
+                    + np.log(self.upper / self.lower)
+                    * np.random.uniform(0, 1, self.dim)
+                ) * np.random.choice([-1, 1], self.dim)
             else:
                 if isinstance(self.func, ODE_Equation):
                     self.X[i] = [np.random.uniform(-10, 10) for _ in range(self.dim)]
                     self.V[i] = [np.random.uniform(-10, 10) for _ in range(self.dim)]
                 elif isinstance(self.func, PDE_Equation):
-                    self.X[i] = [np.random.uniform(0, self.upper) for _ in range(self.dim)]
-                    self.V[i] = [np.random.uniform(0, self.upper) for _ in range(self.dim)]
+                    self.X[i] = [
+                        np.random.uniform(0, self.upper) for _ in range(self.dim)
+                    ]
+                    self.V[i] = [
+                        np.random.uniform(0, self.upper) for _ in range(self.dim)
+                    ]
 
             self.pBest[i] = self.X[i]
             tmp = self.mse_loss(self.X[i])
@@ -175,14 +204,17 @@ class PSO_ALGORITHM:
             for i in range(currentTotalLayer - 1, 1, -1):
                 for j in self.layers[i]:
                     exemplarLevels = self.level_competition(i, t)
-                    if(exemplarLevels[0] == exemplarLevels[1]):
-                        index1 = np.random.randint(0, len(self.layers[exemplarLevels[0]]) - 2)
-                        index2 = np.random.randint(index1 + 1, len(self.layers[exemplarLevels[0]]) - 1)
+                    if exemplarLevels[0] == exemplarLevels[1]:
+                        index1 = np.random.randint(
+                            0, len(self.layers[exemplarLevels[0]]) - 2
+                        )
+                        index2 = np.random.randint(
+                            index1 + 1, len(self.layers[exemplarLevels[0]]) - 1
+                        )
                         id1 = self.layers[exemplarLevels[0]][index1]
                         id2 = self.layers[exemplarLevels[0]][index2]
 
                     else:
-
                         id1 = np.random.choice(self.layers[exemplarLevels[0]])
                         id2 = np.random.choice(self.layers[exemplarLevels[1]])
 
@@ -193,7 +225,11 @@ class PSO_ALGORITHM:
                     self.r2 = np.random.uniform(0, 1)
                     self.r3 = np.random.uniform(0, 1)
 
-                    self.V[j] = self.r1 * self.V[j] + self.r2 * (X1 - self.X[j]) + self.r3 * self.phi * (X2 - self.X[j])
+                    self.V[j] = (
+                        self.r1 * self.V[j]
+                        + self.r2 * (X1 - self.X[j])
+                        + self.r3 * self.phi * (X2 - self.X[j])
+                    )
                     self.X[j] = self.X[j] + self.V[j]
 
             for k in self.layers[1]:
@@ -208,17 +244,25 @@ class PSO_ALGORITHM:
                 self.r2 = np.random.uniform(0, 1)
                 self.r3 = np.random.uniform(0, 1)
 
-                self.V[k] = self.r1 * self.V[k] + self.r2 * (X1 - self.X[k]) + self.r3 * self.phi * (X2 - self.X[k])
+                self.V[k] = (
+                    self.r1 * self.V[k]
+                    + self.r2 * (X1 - self.X[k])
+                    + self.r3 * self.phi * (X2 - self.X[k])
+                )
                 self.X[k] = self.X[k] + self.V[k]
 
-            if (t == int(self.max_iter / 2) and self.fit > 1e-04):
+            if t == int(self.max_iter / 2) and self.fit > 1e-04:
                 for i in range(self.pN):
-                        self.X[i] = np.exp(np.log(self.lower) + np.log(self.upper / self.lower) * np.random.uniform(0, 1,
-                                                                                                                       self.dim)) * np.random.choice(
-                            [-1, 1], self.dim)
-                        self.V[i] = np.exp(np.log(self.lower) + np.log(self.upper / self.lower) * np.random.uniform(0, 1,
-                                                                                                                       self.dim)) * np.random.choice(
-                            [-1, 1], self.dim)
+                    self.X[i] = np.exp(
+                        np.log(self.lower)
+                        + np.log(self.upper / self.lower)
+                        * np.random.uniform(0, 1, self.dim)
+                    ) * np.random.choice([-1, 1], self.dim)
+                    self.V[i] = np.exp(
+                        np.log(self.lower)
+                        + np.log(self.upper / self.lower)
+                        * np.random.uniform(0, 1, self.dim)
+                    ) * np.random.choice([-1, 1], self.dim)
 
             for i in range(self.pN):
                 temp = self.mse_loss(self.X[i])
@@ -232,8 +276,11 @@ class PSO_ALGORITHM:
             preFitness = self.mse_loss(pregBest)
             curFitness = self.mse_loss(self.gBest)
             reward = abs(curFitness - preFitness) / abs(max(curFitness, 1e-10))
-            newQ = (self.qTable[self.preState][self.currentState] +
-                                                            self.alpha * (reward + self.gamma * max(self.qTable[self.currentState]) - self.qTable[self.preState][self.currentState]))
+            newQ = self.qTable[self.preState][self.currentState] + self.alpha * (
+                reward
+                + self.gamma * max(self.qTable[self.currentState])
+                - self.qTable[self.preState][self.currentState]
+            )
             self.qTable[self.preState][self.currentState] = newQ
 
     def get_global_best(self):
@@ -247,8 +294,16 @@ class PSO_ALGORITHM:
 
 
 class RLLPSO(Estimator):
-    def __init__(self, func: Equation, particle_num=100, max_iter=200, 
-                 layers_list=[4, 6, 8, 10], upper=10, lower=1e-10, regularization=False):
+    def __init__(
+        self,
+        func: Equation,
+        particle_num=100,
+        max_iter=200,
+        layers_list=[4, 6, 8, 10],
+        upper=10,
+        lower=1e-10,
+        regularization=False,
+    ):
         self.func = func
         self.particle_num = particle_num
         self.max_iter = max_iter
@@ -262,9 +317,15 @@ class RLLPSO(Estimator):
 
     def predict(self, data, time):
         estimator = PSO_ALGORITHM(
-            self.func, data, time,
-            self.particle_num, self.max_iter, self.layers_list,
-            self.upper, self.lower, self.regularization
+            self.func,
+            data,
+            time,
+            self.particle_num,
+            self.max_iter,
+            self.layers_list,
+            self.upper,
+            self.lower,
+            self.regularization,
         )
         estimator.init_population()
         estimator.iterator()

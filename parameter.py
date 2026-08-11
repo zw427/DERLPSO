@@ -2,6 +2,7 @@ from typing import List
 
 import numpy as np
 
+
 class Parameter:
     def __init__(self, distributions: List):
         """
@@ -13,7 +14,7 @@ class Parameter:
 
         a = Normal(mu = 0.0, sigma = 1.0)
         b = Normal(mu = 0.0, sigma = 1.0)
-        # this also works: 
+        # this also works:
         # ab = Normal(mu = [0.0, 0.0], sigma = [1.0, 1.0])
         c = Uniform(a = 0, b = 10)
         distributions = [a, b, c]
@@ -30,7 +31,9 @@ class Parameter:
         Sample n values from each distribution and concatenate results column-wise.
         """
         # must use np.random.Generator to ensure replication
-        samples = [dist.sample((n, 1), rng=rng).squeeze(1) for dist in self.distributions]
+        samples = [
+            dist.sample((n, 1), rng=rng).squeeze(1) for dist in self.distributions
+        ]
         # Ensure each sample is 2D for concatenation
         samples = [np.expand_dims(s, 1) if s.ndim == 1 else s for s in samples]
         return np.concat(samples, axis=1)

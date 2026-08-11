@@ -9,10 +9,19 @@ from Estimators.estimator import Estimator
 
 
 class DERLPSO_ALGORITHM:
-    def __init__(self, func: Equation, data, times, particle_num=100,
-                 max_iter=200, layers_list=[4, 6, 8, 10], upper=10,
-                 lower=1e-10, threshold=1e-04, regularization=False):
-
+    def __init__(
+        self,
+        func: Equation,
+        data,
+        times,
+        particle_num=100,
+        max_iter=200,
+        layers_list=[4, 6, 8, 10],
+        upper=10,
+        lower=1e-10,
+        threshold=1e-04,
+        regularization=False,
+    ):
         self.func = func
         self.upper = upper
         self.lower = lower
@@ -28,11 +37,11 @@ class DERLPSO_ALGORITHM:
         self.p_best = np.zeros((self.particle_num, self.param_num))
         self.global_best = np.zeros((1, self.param_num))
         self.p_fit = np.zeros(self.particle_num)
-        self.fit = float('inf')
+        self.fit = float("inf")
 
         # Data and time setup
         if isinstance(self.func, ODE_Equation):
-            self.initial = data[0, ]
+            self.initial = data[0,]
             self.times = times
             self.data = data
         elif isinstance(self.func, PDE_Equation):
@@ -59,7 +68,7 @@ class DERLPSO_ALGORITHM:
 
     def get_data(self):
         return self.data
-    
+
     def get_global_best(self):
         return self.global_best
 
@@ -68,15 +77,22 @@ class DERLPSO_ALGORITHM:
 
     def mse_loss(self, X):
         """Calculate MSE loss between predicted and actual data."""
-        temp_x = tuple(X),
+        temp_x = (tuple(X),)
         if isinstance(self.func, ODE_Equation):
-            predicted_data = odeint(self.func.f(), self.initial, self.times,
-                                        args=temp_x, tfirst=self.func.t_first)
+            predicted_data = odeint(
+                self.func.f(),
+                self.initial,
+                self.times,
+                args=temp_x,
+                tfirst=self.func.t_first,
+            )
         elif isinstance(self.func, PDE_Equation):
             predicted_data = self.func.f()(X)
 
         if self.regularization:
-            mse = (1 + np.linalg.norm(X)) * np.mean((self.data - predicted_data) ** 2) + 0.01 * np.linalg.norm(X)
+            mse = (1 + np.linalg.norm(X)) * np.mean(
+                (self.data - predicted_data) ** 2
+            ) + 0.01 * np.linalg.norm(X)
         else:
             mse = np.mean((self.data - predicted_data) ** 2)
         return mse
@@ -84,7 +100,7 @@ class DERLPSO_ALGORITHM:
     def select_action(self):
         """
         Select action using epsilon-greedy strategy.
-        
+
         Returns:
             Selected number of layers
         """
@@ -100,15 +116,16 @@ class DERLPSO_ALGORITHM:
     def divide_particles(self, current_total_layer, fitness):
         """
         Divide particles into layers based on fitness.
-        
+
         Args:
             current_total_layer: Current number of layers
             fitness: Fitness values of all particles
         """
         base_count = self.particle_num // current_total_layer
         remainder = self.particle_num % current_total_layer
-        layer_counts = ([base_count] * (current_total_layer - 1) +
-                       [base_count + remainder])
+        layer_counts = [base_count] * (current_total_layer - 1) + [
+            base_count + remainder
+        ]
 
         particles = list(range(0, self.particle_num))
         sorted_particles = [x for _, x in sorted(zip(fitness, particles))]
@@ -123,17 +140,17 @@ class DERLPSO_ALGORITHM:
     def level_competition(self, lec, fe_count):
         """
         Perform level competition to select exemplar levels.
-        
+
         Args:
             lec: Current level
             fe_count: Function evaluation count
-            
+
         Returns:
             List of two exemplar levels
         """
         prob = (fe_count / self.max_iter) ** 2
         exemplar_levels = [None, None]
-        
+
         for i in range(2):
             if np.random.random() < prob:
                 lec1 = np.random.randint(0, lec - 1)
@@ -143,8 +160,10 @@ class DERLPSO_ALGORITHM:
                 exemplar_levels[i] = np.random.randint(0, lec - 1)
 
         if exemplar_levels[1] < exemplar_levels[0]:
-            exemplar_levels[0], exemplar_levels[1] = (exemplar_levels[1],
-                                                     exemplar_levels[0])
+            exemplar_levels[0], exemplar_levels[1] = (
+                exemplar_levels[1],
+                exemplar_levels[0],
+            )
         return exemplar_levels
 
     def init_particles(self):
@@ -152,30 +171,40 @@ class DERLPSO_ALGORITHM:
         for i in range(self.particle_num):
             if i <= self.particle_num / 2:
                 # Log-uniform initialization
-                self.X[i] = (np.exp(np.log(self.lower) +
-                           np.log(self.upper / self.lower) *
-                           np.random.uniform(0, 1, self.param_num)) *
-                           np.random.choice([-1, 1], self.param_num))
-                self.V[i] = (np.exp(np.log(self.lower) +
-                           np.log(self.upper / self.lower) *
-                           np.random.uniform(0, 1, self.param_num)) *
-                           np.random.choice([-1, 1], self.param_num))
+                self.X[i] = np.exp(
+                    np.log(self.lower)
+                    + np.log(self.upper / self.lower)
+                    * np.random.uniform(0, 1, self.param_num)
+                ) * np.random.choice([-1, 1], self.param_num)
+                self.V[i] = np.exp(
+                    np.log(self.lower)
+                    + np.log(self.upper / self.lower)
+                    * np.random.uniform(0, 1, self.param_num)
+                ) * np.random.choice([-1, 1], self.param_num)
             else:
                 # Uniform initialization
                 if isinstance(self.func, ODE_Equation):
-                    self.X[i] = [np.random.uniform(-self.upper, self.upper)
-                            for _ in range(self.param_num)]
-                    self.V[i] = [np.random.uniform(-self.upper, self.upper)
-                            for _ in range(self.param_num)]
+                    self.X[i] = [
+                        np.random.uniform(-self.upper, self.upper)
+                        for _ in range(self.param_num)
+                    ]
+                    self.V[i] = [
+                        np.random.uniform(-self.upper, self.upper)
+                        for _ in range(self.param_num)
+                    ]
                 elif isinstance(self.func, PDE_Equation):
-                    self.X[i] = [np.random.uniform(0, self.upper) for _ in range(self.param_num)]
-                    self.V[i] = [np.random.uniform(0, self.upper) for _ in range(self.param_num)]
-            
+                    self.X[i] = [
+                        np.random.uniform(0, self.upper) for _ in range(self.param_num)
+                    ]
+                    self.V[i] = [
+                        np.random.uniform(0, self.upper) for _ in range(self.param_num)
+                    ]
+
             self.p_best[i] = self.X[i]
             tmp = self.mse_loss(self.X[i])
             self.fitness.append(tmp)
             self.p_fit[i] = tmp
-            
+
             if tmp < self.fit:
                 self.fit = tmp
                 self.global_best = self.X[i]
@@ -187,23 +216,25 @@ class DERLPSO_ALGORITHM:
             current_total_layer = self.select_action()
 
             self.divide_particles(current_total_layer, self.fitness)
-            
+
             # Update particles in layers 2 to current_total_layer-1
             for i in range(current_total_layer - 1, 1, -1):
                 for j in self.layers[i]:
                     exemplar_levels = self.level_competition(i, t)
-                    
+
                     if exemplar_levels[0] == exemplar_levels[1]:
                         index1 = np.random.randint(
-                            0, len(self.layers[exemplar_levels[0]]) - 2)
+                            0, len(self.layers[exemplar_levels[0]]) - 2
+                        )
                         index2 = np.random.randint(
-                            index1 + 1, len(self.layers[exemplar_levels[0]]) - 1)
+                            index1 + 1, len(self.layers[exemplar_levels[0]]) - 1
+                        )
                         id1 = self.layers[exemplar_levels[0]][index1]
                         id2 = self.layers[exemplar_levels[0]][index2]
                     else:
                         id1 = np.random.choice(self.layers[exemplar_levels[0]])
                         id2 = np.random.choice(self.layers[exemplar_levels[1]])
-                    
+
                     X1 = self.X[id1]
                     X2 = self.X[id2]
 
@@ -211,8 +242,11 @@ class DERLPSO_ALGORITHM:
                     r2 = np.random.uniform(0, 1)
                     r3 = np.random.uniform(0, 1)
 
-                    self.V[j] = (r1 * self.V[j] + r2 * (X1 - self.X[j]) +
-                               r3 * self.phi * (X2 - self.X[j]))
+                    self.V[j] = (
+                        r1 * self.V[j]
+                        + r2 * (X1 - self.X[j])
+                        + r3 * self.phi * (X2 - self.X[j])
+                    )
                     self.X[j] = self.X[j] + self.V[j]
 
             # Update particles in layer 1
@@ -228,32 +262,37 @@ class DERLPSO_ALGORITHM:
                 r2 = np.random.uniform(0, 1)
                 r3 = np.random.uniform(0, 1)
 
-                self.V[k] = (r1 * self.V[k] + r2 * (X1 - self.X[k]) +
-                           r3 * self.phi * (X2 - self.X[k]))
+                self.V[k] = (
+                    r1 * self.V[k]
+                    + r2 * (X1 - self.X[k])
+                    + r3 * self.phi * (X2 - self.X[k])
+                )
                 self.X[k] = self.X[k] + self.V[k]
 
             # Restart particles if needed at mid-iteration
             if t == int(self.max_iter / 2) and self.fit > self.threshold:
                 for i in range(self.particle_num):
-                    self.X[i] = (np.exp(np.log(self.lower) +
-                               np.log(self.upper / self.lower) *
-                               np.random.uniform(0, 1, self.param_num)) *
-                               np.random.choice([-1, 1], self.param_num))
-                    self.V[i] = (np.exp(np.log(self.lower) +
-                               np.log(self.upper / self.lower) *
-                               np.random.uniform(0, 1, self.param_num)) *
-                               np.random.choice([-1, 1], self.param_num))
+                    self.X[i] = np.exp(
+                        np.log(self.lower)
+                        + np.log(self.upper / self.lower)
+                        * np.random.uniform(0, 1, self.param_num)
+                    ) * np.random.choice([-1, 1], self.param_num)
+                    self.V[i] = np.exp(
+                        np.log(self.lower)
+                        + np.log(self.upper / self.lower)
+                        * np.random.uniform(0, 1, self.param_num)
+                    ) * np.random.choice([-1, 1], self.param_num)
 
             # Update fitness and best positions
             self.fitness.clear()
             for i in range(self.particle_num):
                 temp = self.mse_loss(self.X[i])
                 self.fitness.append(temp)
-                
+
                 if temp < self.p_fit[i]:
                     self.p_fit[i] = temp
                     self.p_best[i] = self.X[i]
-                    
+
                     if self.p_fit[i] < self.fit:
                         self.global_best = self.X[i]
                         self.fit = self.p_fit[i]
@@ -261,19 +300,27 @@ class DERLPSO_ALGORITHM:
             # Update Q-table
             pre_fitness = self.mse_loss(pre_g_best)
             cur_fitness = self.mse_loss(self.global_best)
-            reward = (abs(cur_fitness - pre_fitness) /
-                     abs(max(cur_fitness, 1e-10)))
-            new_q = (self.q_table[self.pre_state][self.current_state] +
-                    self.alpha * (reward + self.gamma *
-                                 max(self.q_table[self.current_state]) -
-                                 self.q_table[self.pre_state][self.current_state]))
+            reward = abs(cur_fitness - pre_fitness) / abs(max(cur_fitness, 1e-10))
+            new_q = self.q_table[self.pre_state][self.current_state] + self.alpha * (
+                reward
+                + self.gamma * max(self.q_table[self.current_state])
+                - self.q_table[self.pre_state][self.current_state]
+            )
             self.q_table[self.pre_state][self.current_state] = new_q
 
 
 class DERLPSO(Estimator):
-    def __init__(self, func: Equation, particle_num=100,
-                 max_iter=200, layers_list=[4, 6, 8, 10], upper=10,
-                 lower=1e-10, threshold=1e-04, regularization=False):
+    def __init__(
+        self,
+        func: Equation,
+        particle_num=100,
+        max_iter=200,
+        layers_list=[4, 6, 8, 10],
+        upper=10,
+        lower=1e-10,
+        threshold=1e-04,
+        regularization=False,
+    ):
         self.func = func
         self.particle_num = particle_num
         self.max_iter = max_iter
@@ -282,15 +329,22 @@ class DERLPSO(Estimator):
         self.lower = lower
         self.threshold = threshold
         self.regularization = regularization
-        
+
     def train(self):
         raise Exception("DERLPSO does not need to train.")
 
     def predict(self, data, time):
         estimator = DERLPSO_ALGORITHM(
-            self.func, data, time,
-            self.particle_num, self.max_iter, self.layers_list,
-            self.upper, self.lower, self.threshold, self.regularization
+            self.func,
+            data,
+            time,
+            self.particle_num,
+            self.max_iter,
+            self.layers_list,
+            self.upper,
+            self.lower,
+            self.threshold,
+            self.regularization,
         )
         estimator.init_particles()
         estimator.iterator()
